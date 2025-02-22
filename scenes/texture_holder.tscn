@@ -1,0 +1,3 @@
+[gd_scene format=3 uid="uid://cpgpt7dfqkdef"]
+
+[node name="TextureHolder" type="Sprite2D"]
