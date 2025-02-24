@@ -52,8 +52,10 @@ var selected_piece : Vector2
 # Move history... index is turn number, element is dict with move data
 var history : Array[Dictionary] = []
 # special handling - en passant, castling etc
-# holds the pos of the captured piece during en passant
-var en_passant := Vector2()
+# holds the pos of the captured piece during special moves
+var en_passant : Array[Vector2] = []
+# start and end pos of a rook after a castle
+var castled_rook : Array[Vector2] = []
 # once king moves it is ineligible for castling -> (white moved, black moved)
 var king_moved := {"white" : false, "black" : true }
 # Same for the castling rook, we'll track (white left, white right, black left, black right)
@@ -130,25 +132,29 @@ func set_move(row: int, col: int) -> void:
 		# if input coords == a legal move, update the board and record history
 		if move.x == row && move.y == col:
 			# value of square at selected move pos
-			var capture_pos := Vector2()
-			var captured_val : int = 0
+			var end_pos := Vector2()
+			var end_val : int = 0
+			# value of the selected piece
+			var selected_value : int = board[selected_piece.x][selected_piece.y]
 			
 			# SPECIAL MOVE HANDLING
 			# en passant
-			var is_passant : bool = en_passant.length() != 0
+			# castling
 			
-			if is_passant:
-				capture_pos = en_passant
-				captured_val =  board[en_passant.x][en_passant.y]
-				# update board to reflect pawn captured
-				board[en_passant.x][en_passant.y] = 0
-				en_passant = Vector2()
-			else:
-				capture_pos = Vector2(row,col)
-				captured_val = board[row][col]
-				
-			# value of the selected piece to update board
-			var selected_value : int = board[selected_piece.x][selected_piece.y]
+			#if is_passant:
+				#end_pos = en_passant
+				#end_val =  board[en_passant.x][en_passant.y]
+				## update board to reflect pawn captured
+				#board[en_passant.x][en_passant.y] = 0
+				#en_passant = Vector2()
+			#elif is_castle:
+				#end_pos = Vector2(row, col)
+				#end_val = 0
+				##board[]
+			#else:
+				#end_pos = Vector2(row,col)
+				#end_val = board[row][col]
+
 			# update the board to reflect value of the moved piece
 			board[row][col] = selected_value
 			# update the exiting square in board to show empty
@@ -159,7 +165,7 @@ func set_move(row: int, col: int) -> void:
 				selected_piece,
 				Vector2(row,col),
 				selected_value,
-				captured_val
+				end_val
 			)
 			
 			# change the color / turn
@@ -176,12 +182,12 @@ func set_move(row: int, col: int) -> void:
 	# MAKE TWO LEFT-CLICKS TO RESELECT PIECE FOR NEW OPTIONS. FUCK THIS PROBLEM.
 
 
-func record_history(start_pos: Vector2, end_pos: Vector2, selected_value: int, captured_value: int) -> void:
+func record_history(start_pos: Vector2, end_pos: Vector2, selected_value: int, end_value: int) -> void:
 	history.append({
 	"start_pos" : start_pos, 
 	"end_pos" : end_pos,
 	"piece" : selected_value,
-	"captured" : captured_value
+	"captured" : end_value
 	})
 	
 	# track "has moved" for special rules handling
@@ -295,8 +301,7 @@ func get_pawn_moves(pawn: Vector2) -> Array[Vector2]:
 						# get the diagonal direction
 						var dir = Vector2(direction.x,vec.y)
 						_moves.append(pawn + dir)
-						# record the pos of capture for special handling
-						en_passant = pos
+						en_passant.append(pawn + dir)
 			pos = pawn
 	return _moves
 
@@ -399,28 +404,60 @@ func get_king_moves(king: Vector2) -> Array[Vector2]:
 	
 	# check castle eligibility and return moves
 	if !is_in_check(king):
+		print("king is not in check")
 		# king can't have already moved
-		if (white && king_moved.x == 0) or (!white && king_moved.y == 0):
+		if (white && !king_moved["white"]) or (!white && !king_moved["black"]):
+			print("king has not moved")
+			# directions_left[1] and _right[1] have the correct move if castle eligible
 			var directions_left := [Vector2(0,-1), Vector2(0,-2)]
 			var directions_right := [Vector2(0,1), Vector2(0,2), Vector2(0,3)]
 
 			for dir in directions_left:
 				var pos : Vector2 = king
 				pos += dir
-				
-				while is_empty(pos):
-					if is_in_check(pos): break
+
+				while pos.y >= 0:
+					# rook can't have already moved
+					if (white && rook_moved["white left"]) or (!white && rook_moved["black left"]):
+						print("rook has moved :(")
+						break
+					# spaces between must be empty
+					if !is_empty(pos) && pos.y != 0:
+						print("the spaces are not empty :(")
+						break
+					# cannot castle through check (but don't test the rook)
+					if is_in_check(pos) && pos.y != 0:
+						print("cannot castle through check :(")
+						break
 					# if we arrive to the 0 column and the rook there has not moved
+					# we are golden!
 					if pos.y == 0:
-						if (white && rook_moved[0] == 0) or (!white && rook_moved[2] == 0)
-							_moves.append()
-			_moves.append(pos)
-				
-				
+						print("can castle!")
+						_moves.append(king + directions_left[1])
+						var row = 0 if white else 7
+						castled_rook.append(Vector2(row, 0))
+						break
+					pos += dir
+			
+			for dir in directions_right:
+				var pos : Vector2 = king
+				pos += dir
+
+				while pos.y <= 7:
+					if (white && rook_moved["white right"]) or (!white && rook_moved["black right"]):
+						break
+					if is_in_check(pos) && pos.y != 7: 
+						break
+					if !is_empty(pos) && pos.y != 7:
+						print("the spaces are not empty :(")
+						break
+					if pos.y == 7:
+						_moves.append(king + directions_right[1])
+						var row = 0 if white else 7
+						castled_rook.append(Vector2(row, 7))
+						break
+					pos += dir
 	return _moves
-	
-func get_castling_moves() -> Array[Vector2]:
-	return []
 
 
 # Can input any position parameter to see if that position is in check
