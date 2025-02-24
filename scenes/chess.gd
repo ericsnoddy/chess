@@ -51,8 +51,13 @@ var moves := []
 var selected_piece : Vector2
 # Move history... index is turn number, element is dict with move data
 var history : Array[Dictionary] = []
-# holds the pos of the captured piece during en passant, for special handling
+# special handling - en passant, castling etc
+# holds the pos of the captured piece during en passant
 var en_passant := Vector2()
+# once king moves it is ineligible for castling -> (white moved, black moved)
+var king_moved := Vector2()		# updated when recording move history
+# Same for the castling rook, we'll track (white left, white right, black left, black right)
+var rook_moved := Vector4()		# updated when recording move history
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -178,6 +183,17 @@ func record_history(start_pos: Vector2, end_pos: Vector2, selected_value: int, c
 	"piece" : selected_value,
 	"captured" : captured_value
 	})
+	
+	# track "has moved" for special rules handling
+	# We don't have to worry about irrelevant pieces triggering this match
+	# because the relevant piece necessarily has to move first
+	match start_pos:
+		Vector2(0,3) : king_moved.x = 1
+		Vector2(7,3) : king_moved.y = 1
+		Vector2(0,0) : rook_moved.x = 1
+		Vector2(0,7) : rook_moved.y = 1
+		Vector2(7,0) : rook_moved.z = 1
+		Vector2(7,7) : rook_moved.w = 1
 
 
 func show_options() -> void:
@@ -380,67 +396,31 @@ func get_king_moves(king: Vector2) -> Array[Vector2]:
 		pos += dir
 		if is_in_bounds(pos) and is_empty(pos) and !is_in_check(pos):
 			_moves.append(pos)
-	return _moves
-
-
-func is_in_check(check_pos: Vector2) -> bool:
-	# temporarily change color to get proper movesets
-	white = !white
-	var opp_moves : Array[Vector2] = []
-	return false
-
-
-func is_in_check2(check_pos: Vector2, directions: Array[Vector2]) -> bool:
-	# directions for bishop, rook, queen
-	var directions_extended : Array[Vector2] = [
-		Vector2(1,0), Vector2(1,1), Vector2(0,1), Vector2(-1,1),
-		Vector2(-1,0), Vector2(-1,-1), Vector2(0,-1), Vector2(1,-1)
-	]
-	# directions for knights
-	var directions_knight : Array[Vector2] = [
-		Vector2(2,1), Vector2(1,2), Vector2(-1,2), Vector2(-2,1), 
-		Vector2(-2,-1), Vector2(-1,-2), Vector2(1,-2), Vector2(2, -1)
-	]
-	# direction for pawns, combining white and black
-	var directions_pawn : Array[Vector2] = [Vector2(1,-1), Vector2(1,1), Vector2(-1,-1), Vector2(-1,1)]
 	
-	# check rooks, bishops, and queens
-	for dir in directions_extended:
-		var pos = check_pos
-		pos += dir
-		while is_in_bounds(pos):
-			var opp : int = board[pos.x][pos.y]
-			# if a pawn or knight in the way, safe
-			if abs(opp) == 1 || abs(opp) == 2:
-				break
-			# if own color in the way, safe
-			if (white && opp > 0) or (!white && opp < 0):
-				break
-			if white && (opp == -3 || opp == -4 || opp == -5):
-				return false
-			if !white and (opp == 3 || opp == 4 || opp == 5):
-				return false
-			pos += dir
-		pos = check_pos
-		
-	# check knight positions
-	for dir in directions_knight:
-		var pos = check_pos
-		pos += dir
-		if (white && board[pos.x][pos.y] == -2) || (!white && board[pos.x][pos.y] == 2):
-			return false
-		pos = check_pos
-		
-	# check pawn positions
-	for dir in directions_pawn:
-		var pos = check_pos
-		pos += dir
-		var piece : int = board[pos.x][pos.y]
-		if (white && piece < 0 && pos.x > 0) || (!white && piece > 0 && pos.x < 0):
-			return false
-		pos = check_pos
-		
-	return true
+	# check castle eligibility and return moves
+	if !is_in_check(king):
+		# king can't have already moved
+		if (white && king_moved.x == 0) or (!white && king_moved.y == 0):
+			directions = [
+				Vector2(0,-1), Vector2(0,-2), Vector2(0,1), Vector2(0,2), Vector2(0,3)
+			]
+			for dir in directions:
+				var pos : Vector2 = king
+				pos += dir
+				var empty := false
+				# already know it's in bounds: check empty or passing through check
+				if !is_empty(pos) || is_in_check(pos): break
+				_moves.append_array(get_castling_moves())
+				
+	return _moves
+	
+func get_castling_moves() -> Array[Vector2]:
+	return []
+
+
+# Can input any position parameter to see if that position is in check
+func is_in_check(check_pos: Vector2) -> bool:
+	return false
 
 
 func display_board() -> void:
