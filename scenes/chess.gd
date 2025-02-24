@@ -46,7 +46,7 @@ var white : bool = true
 # Two states for the player: "selecting" and "confirming""
 var state : String = "selecting"
 # hold possible moves for currently selected piece
-var moves := []
+var moves : Array[Vector2] = []
 # pos of currently selected piece
 var selected_piece : Vector2
 # Move history... index is turn number, element is dict with move data
@@ -55,9 +55,9 @@ var history : Array[Dictionary] = []
 # holds the pos of the captured piece during en passant
 var en_passant := Vector2()
 # once king moves it is ineligible for castling -> (white moved, black moved)
-var king_moved := Vector2()		# updated when recording move history
+var king_moved := {"white" : false, "black" : true }
 # Same for the castling rook, we'll track (white left, white right, black left, black right)
-var rook_moved := Vector4()		# updated when recording move history
+var rook_moved := {"white left" : false, "black left" : false, "white right" : false, "black right" : false}
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -186,14 +186,14 @@ func record_history(start_pos: Vector2, end_pos: Vector2, selected_value: int, c
 	
 	# track "has moved" for special rules handling
 	# We don't have to worry about irrelevant pieces triggering this match
-	# because the relevant piece necessarily has to move first
+	# because the relevant pieces necessarily have to move first
 	match start_pos:
-		Vector2(0,3) : king_moved.x = 1
-		Vector2(7,3) : king_moved.y = 1
-		Vector2(0,0) : rook_moved.x = 1
-		Vector2(0,7) : rook_moved.y = 1
-		Vector2(7,0) : rook_moved.z = 1
-		Vector2(7,7) : rook_moved.w = 1
+		Vector2(0,3) : king_moved["white"] = true
+		Vector2(7,3) : king_moved["black"] = true
+		Vector2(0,0) : rook_moved["white left"] = true
+		Vector2(0,7) : rook_moved["white right"] = true
+		Vector2(7,0) : rook_moved["black left"] = true
+		Vector2(7,7) : rook_moved["black right"] = true
 
 
 func show_options() -> void:
@@ -401,16 +401,21 @@ func get_king_moves(king: Vector2) -> Array[Vector2]:
 	if !is_in_check(king):
 		# king can't have already moved
 		if (white && king_moved.x == 0) or (!white && king_moved.y == 0):
-			directions = [
-				Vector2(0,-1), Vector2(0,-2), Vector2(0,1), Vector2(0,2), Vector2(0,3)
-			]
-			for dir in directions:
+			var directions_left := [Vector2(0,-1), Vector2(0,-2)]
+			var directions_right := [Vector2(0,1), Vector2(0,2), Vector2(0,3)]
+
+			for dir in directions_left:
 				var pos : Vector2 = king
 				pos += dir
-				var empty := false
-				# already know it's in bounds: check empty or passing through check
-				if !is_empty(pos) || is_in_check(pos): break
-				_moves.append_array(get_castling_moves())
+				
+				while is_empty(pos):
+					if is_in_check(pos): break
+					# if we arrive to the 0 column and the rook there has not moved
+					if pos.y == 0:
+						if (white && rook_moved[0] == 0) or (!white && rook_moved[2] == 0)
+							_moves.append()
+			_moves.append(pos)
+				
 				
 	return _moves
 	
