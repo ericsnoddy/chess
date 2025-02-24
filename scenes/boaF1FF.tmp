@@ -12,5 +12,3 @@ script = ExtResource("2_farg4")
 [node name="Dots" type="Node2D" parent="."]
 
 [node name="Turn" type="Sprite2D" parent="."]
-modulate = Color(1, 1, 1, 0.588235)
-z_index = -10

@@ -43,21 +43,24 @@ const PIECE_MOVE = preload("res://assets/Piece_move.png")
 var board : Array
 # white's turn = true, black's turn = false
 var white : bool = true
-# Two states for the player: "selecting" = selecting a move, "confirming" = confirming the move
+# Two states for the player: "selecting" and "confirming""
 var state : String = "selecting"
 # hold possible moves for currently selected piece
 var moves := []
-# hold information on (white, black) pawn 1st pawn movement starting in col = 0
-var pawn_data : Array[Vector2]
+# pos of currently selected piece
 var selected_piece : Vector2
-# Move history... pos : (x,y) = (row,col) piece: (z,w) = (moved, captured = 0)
-var move_history : Array[Vector4] = []
+# Move history... index is turn number, element is dict with move data
+var history : Array[Dictionary] = []
+# holds the pos of the square the capturing piece is moved to, in order to
+# derive location of the captured piece to remove
+var en_passant := Vector2()
+
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	# bottom-left is [0,0]: see key above for piece values
 	board.append([4, 2, 3, 6, 5, 3, 2, 4])	# white pieces, [0,0] -> [0,7]
-	board.append([1, 1, 1, 1, 0, 1, 1, 1])	# [1,0] -> [1,7]
+	board.append([1, 1, 1, 1, 1, 1, 1, 1])	# [1,0] -> [1,7]
 	board.append([0, 0, 0, 0, 0, 0, 0, 0])
 	board.append([0, 0, 0, 0, 0, 0, 0, 0])
 	board.append([0, 0, 0, 0, 0, 0, 0, 0])
@@ -65,31 +68,28 @@ func _ready() -> void:
 	board.append([-1, -1, -1, -1, -1, -1, -1, -1])
 	board.append([-4, -2, -3, -6, -5, -3, -2, -4])	# [7,0] -> [7,7]
 	
+	# only calls display_board() once on _ready - make sure to call it below in the game loop
 	display_board()
-	
-	# this holds data on pawns' first moves: 0 (no move) or 1 or 2 (spaces):
-	# for determining move, capture, and en passant eligibilities
-	pawn_data.resize(8)
-	pawn_data.fill(Vector2())
-	
-	## debug
-	#pawn_data[5] = Vector2(2,0)
-	#pawn_data[6] = Vector2(0,2)
-	#move_history.append_array([Vector4(4,5,1,0), Vector4(4, 6, -1, 0)])
+
 
 func _input(event) -> void:
 	if event is InputEventMouseButton && event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			# don't register interaction if mouse is outside area of the board
 			var mouse_pos : Vector2 = get_global_mouse_position()
+			# don't register interaction if mouse is outside area of the board
 			if is_mouse_out(mouse_pos): 
 				return
 			# nearest whole number / cell width = row/col index
 			# Coords are relative to the CanvasItem, not main display screen
-			# hence why we have to remove negatives from the y-part
-			var col = snapped(mouse_pos.x, 0) / CELL_WIDTH
-			var row = abs(snapped(mouse_pos.y, 0)) / CELL_WIDTH
+			# hence why we have to abs() the y-part - we'll use up == +y for rows
+			var col : int = snapped(mouse_pos.x, 0) / CELL_WIDTH
+			var row : int = abs(snapped(mouse_pos.y, 0)) / CELL_WIDTH
 			
+			# THIS DOESN'T WORK BECAUSE WE LOSE SELECTED_PIECE 
+			#if selected_piece:
+				#if Vector2(row, col) != selected_piece:
+					##selected_piece = Vector2(row,col)
+					#show_dots(false)
 			# If in selection mode: If it's white's turn and a white piece is selected,
 			# or it's black turn and a black piece is selected:
 			if state == "selecting":
@@ -97,24 +97,20 @@ func _input(event) -> void:
 					selected_piece = Vector2(row, col)
 					show_options()
 					state = "confirming"
+			# if options are shown we check if option is taken and then move if so
+			elif state == "confirming":
+				# if another piece is selected before moving, remove dots, change state
+				set_move(row, col)
+				state = "selecting"
 
 
-func show_options() -> void:
-	moves = get_moves(selected_piece)
-	# If there are no legal moves, revert to previous state
-	if moves.is_empty():
-		state = "selecting"
-		return
-	show_dots()
-
-
-func show_dots() -> void:
-	for move in moves:
-		var holder := TEXTURE_HOLDER.instantiate()
-		dots.add_child(holder)
-		holder.texture = PIECE_MOVE
-		# (row, col)
-		holder.global_position = Vector2(move.y * CELL_WIDTH + HALF_CELL, -move.x * CELL_WIDTH - HALF_CELL)
+func is_mouse_out(mouse_pos: Vector2) -> bool:
+	if (
+		mouse_pos.x < 0 or mouse_pos.x > BOARD_LENGTH 
+		or mouse_pos.y > 0 or mouse_pos.y < -BOARD_LENGTH
+	):
+		return true
+	return false
 
 
 func get_moves(piece: Vector2) -> Array:
@@ -129,20 +125,103 @@ func get_moves(piece: Vector2) -> Array:
 		5: valid_moves = get_queen_moves(selected_piece)
 		6: valid_moves = get_king_moves(selected_piece)
 	return valid_moves
-	
 
-# Logic for possible moves for each piece
+
+func set_move(row: int, col: int) -> void:
+	for move in moves:
+		# if input coords == a legal move, update the board and record history
+		if move.x == row && move.y == col:
+			# value of square at selected move pos
+			var capture_pos := Vector2()
+			var captured_val : int = 0
+			
+			# SPECIAL MOVE HANDLING
+			# en passant
+			var is_passant : bool = en_passant.length() != 0
+			
+			if is_passant:
+				capture_pos = en_passant
+				captured_val =  board[en_passant.x][en_passant.y]
+				# update board to reflect pawn captured
+				board[en_passant.x][en_passant.y] = 0
+				en_passant = Vector2()
+			else:
+				capture_pos = Vector2(row,col)
+				captured_val = board[row][col]
+				
+			# value of the selected piece to update board
+			var selected_value : int = board[selected_piece.x][selected_piece.y]
+			# update the board to reflect value of the moved piece
+			board[row][col] = selected_value
+			# update the exiting square in board to show empty
+			board[selected_piece.x][selected_piece.y] = 0
+			
+			# add a dictionary of data to move history array
+			record_history(
+				selected_piece,
+				Vector2(row,col),
+				selected_value,
+				captured_val
+			)
+			
+			# change the color / turn
+			white = !white
+			
+			# The pieces are instantiated children of TextureHolder so they 
+			# will persist unless killed - this is handled by display_board()
+			display_board()
+			break
+	# hide possible moves - await next click
+	show_dots(false)
+	# HERE THE PROGRAM "WAITS" FOR ANOTHER INPUT INSTEAD OF REGISTERING LAST 
+	# LEFT CLICK AS DESIRING A NEW SET OF OPTIONS. UNTIL FIXED THE PLAYER MUST
+	# MAKE TWO LEFT-CLICKS TO RESELECT PIECE FOR NEW OPTIONS. FUCK THIS PROBLEM.
+
+
+func record_history(start_pos: Vector2, end_pos: Vector2, selected_value: int, captured_value: int) -> void:
+	history.append({
+	"start_pos" : start_pos, 
+	"end_pos" : end_pos,
+	"piece" : selected_value,
+	"captured" : captured_value
+	})
+
+
+func show_options() -> void:
+	moves = get_moves(selected_piece)
+	# If there are no legal moves, revert to previous state
+	if moves == []:
+		state = "selecting"
+		return
+	show_dots()
+
+
+func show_dots(show: bool = true) -> void:
+	# show the dots
+	if show:
+		for move in moves:
+			var holder := TEXTURE_HOLDER.instantiate()
+			dots.add_child(holder)
+			holder.texture = PIECE_MOVE
+			# (col, row)
+			holder.global_position = Vector2(move.y * CELL_WIDTH + HALF_CELL, -move.x * CELL_WIDTH - HALF_CELL)
+	# delete the dots
+	else:
+		for child in dots.get_children():
+			child.queue_free()
+
+
 func is_in_bounds(coords: Vector2) -> bool:
 	# First check that the coords exist (on board)
 	if coords.x >= 0 and coords.x < BOARD_SIZE and coords.y >= 0 and coords.y < BOARD_SIZE:
 		return true
 	return false
-	
-	
+
+
 func is_empty(coords: Vector2) -> bool:
 	return board[coords.x][coords.y] == 0
-	
-	
+
+
 func is_opponent(coords: Vector2) -> bool:
 	var piece : int = board[coords.x][coords.y]
 	# if white and piece is black (or vice versa) - valid
@@ -151,82 +230,68 @@ func is_opponent(coords: Vector2) -> bool:
 	return false
 
 
-func is_last_move(pos: Vector2) -> bool:
-	var last_move : Vector4 = move_history.back()
-	return pos == Vector2(last_move.x, last_move.y)
-
-
-# 1 - PAWN
 func get_pawn_moves(pawn: Vector2) -> Array[Vector2]:
 	# Pawn can move forward or diagonally if capturing, or 1 or 2 spaces first move
 	# or en passante if 1 square into opponents half AND opp moves 2 forward prev move
 	var _moves : Array[Vector2] = []
-	
-	# Get info if pawn has moved yet 2 - yes two, 1 - yes one, 0 - no
-	var col_data : Vector2 = pawn_data[selected_piece.y]
-	var pawn_spaces = col_data.x if white else col_data.y
-	# determine if pawn has moved yet and how many spaces
-	var has_moved : int = col_data.x if white else col_data.y
-	
-	# Build array of possible directions - white is always moving up
-	var directions : Array[Vector2] = []
-	if white:
-		directions = [Vector2(1,0)]
-		if has_moved == 0:
-			directions.append(Vector2(2,0))
-		directions.append_array([Vector2(1,-1), Vector2(1,1)])
-	else:
-		directions = [Vector2(-1,0)]
-		if has_moved == 0:
-			directions.append(Vector2(-2,0))
-		directions.append_array([Vector2(-1,-1), Vector2(-1,1)])
-	# check passant
-	directions.append_array([Vector2(0,-1), Vector2(0,1)])
-
-	# check directions
+	var direction : Vector2
+	var is_first_move : bool = false
 	var pos : Vector2 = pawn
-
-	for dir in directions:
-		pos += dir
-		if is_in_bounds(pos):
-			# check vertical
-			if dir.y == 0 and !is_opponent(pos):
+	
+	# get direction of movement
+	if white: direction = Vector2(1,0)
+	else: direction = Vector2(-1,0)
+	
+	# if pawn hasn't moved, can move 1 or 2 spaces
+	if (white && pos.x == 1) or (!white && pos.x == 6):
+		is_first_move = true
+	
+	# check vertical
+	pos += direction
+	if is_in_bounds(pos) && is_empty(pos):
+		_moves.append(pos)
+		if is_first_move:
+			pos += direction
+			# it can't be out of bounds if it's the first move
+			if is_empty(pos):
 				_moves.append(pos)
-			# check passant left - 
-			elif dir == Vector2(0,-1):
-				if is_opponent(pos) and can_passant(pos):
-					_moves.append(pos)
-			# check passant right
-			elif dir == Vector2(0,1):
-				if is_opponent(pos) and can_passant(pos):
-					_moves.append(pos)
-			# check diagonals
-			else:
-				if is_opponent(pos):
-					_moves.append(pos)
+	
+	# check diagonals
+	pos = pawn
+	# look left
+	for vec in [Vector2(0,-1), Vector2(0,1)]:
+		pos += direction + vec
+		if is_in_bounds(pos) and is_opponent(pos):
+			_moves.append(pos)
 		pos = pawn
+
+	# check en passant
+	# must be one square past center
+	if (white && pos.x == 4) or (!white && pos.x == 3):
+		for vec in [Vector2(0,-1), Vector2(0,1)]:
+			pos += vec
+			if is_in_bounds(pos) && is_opponent(pos):
+				# get last move data to test eligibility
+				var last_start : Vector2 = history[-1]["start_pos"]
+				var last_end : Vector2 = history[-1]["end_pos"]
+				# Pawn must have opened for 2 spaces last turn
+				# We're in an eligible en passant row so we know we can look 
+				# two rows back to get the prev opp pawn pos. 'direction'
+				# comes from bool 'white' coded above. Column is ignored.
+				var prev_posx : int = pos.x + direction.x * 2
+				
+				# see if these positions match
+				if last_start.x == prev_posx && last_start.y == pos.y:
+					if last_end.x == pos.x && last_end.y == pos.y:
+						# get the diagonal direction
+						var dir = Vector2(direction.x,vec.y)
+						_moves.append(pawn + dir)
+						# record the pos of capture for special handling
+						en_passant = pos
+			pos = pawn
 	return _moves
 
 
-# accepts a position to check - left OR right
-func can_passant(pos) -> bool:
-	# from last_move: (w,x) is (row, col) and (y,z) is (move, capture) info
-	var last_move : Vector4 = move_history.back()
-	# must be one row past center
-	if (white and selected_piece.x == 4) or (!white and selected_piece.x == 3):
-		# must have opponent directly to the left or right who moved last turn
-		if is_opponent(pos) and is_last_move(pos):
-			# must be a pawn
-			if abs(last_move.z) == 1:
-				# returns (white pawn moved, black pawn moved) for col index
-				var moved : Vector2 = pawn_data[last_move.y]
-				# Must have moved 2 spaces
-				if (white and moved.y == 2) or (!white and moved.x == 2):
-					return true
-	return false
-
-
-# 2 - KNIGHT
 func get_knight_moves(knight: Vector2) -> Array[Vector2]:
 	var _moves : Array[Vector2] = []
 
@@ -244,13 +309,12 @@ func get_knight_moves(knight: Vector2) -> Array[Vector2]:
 	return _moves
 
 
-# 3 - BISHOP
 func get_bishop_moves(bishop: Vector2) -> Array[Vector2]:
 	# Similar logic to ROOK and QUEEN below (see ROOK for comments)
 	var _moves : Array[Vector2] = []
-	var directions_diag = [Vector2(1,-1), Vector2(-1,-1), Vector2(1,1), Vector2(-1,1)]
+	var directions = [Vector2(1,-1), Vector2(-1,-1), Vector2(1,1), Vector2(-1,1)]
 	
-	for dir in directions_diag:
+	for dir in directions:
 		var pos := bishop
 		pos += dir
 		while is_in_bounds(pos):
@@ -264,7 +328,7 @@ func get_bishop_moves(bishop: Vector2) -> Array[Vector2]:
 			pos += dir
 	return _moves
 
-# 4 - ROOK
+
 func get_rook_moves(rook: Vector2) -> Array[Vector2]:
 	var _moves : Array[Vector2] = []
 	# look down, up, left, right
@@ -288,7 +352,6 @@ func get_rook_moves(rook: Vector2) -> Array[Vector2]:
 	return _moves
 
 
-# 5 - QUEEN
 func get_queen_moves(queen: Vector2) -> Array[Vector2]:
 	# Similar logic as ROOK
 	var _moves : Array[Vector2] = []
@@ -312,31 +375,29 @@ func get_queen_moves(queen: Vector2) -> Array[Vector2]:
 	return _moves
 
 
-# 6 - KING
 func get_king_moves(king: Vector2) -> Array[Vector2]:
 	var _moves : Array[Vector2] = []
 	var directions : Array[Vector2] = [
 		Vector2(1,0), Vector2(1,1), Vector2(0,1), Vector2(-1,1),
 		Vector2(-1,0), Vector2(-1,-1), Vector2(0,-1), Vector2(1,-1)
 	]
-	var pos : Vector2 = king
+
 	for dir in directions:
+		var pos : Vector2 = king
 		pos += dir
-		if is_in_bounds(pos) && is_empty(pos) && not is_in_check(pos):
+		if is_in_bounds(pos) and is_empty(pos) and !is_in_check(pos):
 			_moves.append(pos)
-		pos = king
 	return _moves
+
 
 func is_in_check(check_pos: Vector2) -> bool:
 	# temporarily change color to get proper movesets
 	white = !white
 	var opp_moves : Array[Vector2] = []
-
 	return false
-	
-	
+
+
 func is_in_check2(check_pos: Vector2, directions: Array[Vector2]) -> bool:
-	print("check pos: %s" % [check_pos])
 	# directions for bishop, rook, queen
 	var directions_extended : Array[Vector2] = [
 		Vector2(1,0), Vector2(1,1), Vector2(0,1), Vector2(-1,1),
@@ -358,17 +419,13 @@ func is_in_check2(check_pos: Vector2, directions: Array[Vector2]) -> bool:
 			var opp : int = board[pos.x][pos.y]
 			# if a pawn or knight in the way, safe
 			if abs(opp) == 1 || abs(opp) == 2:
-				print("pawn or knight blocks: %s" % [pos])
 				break
 			# if own color in the way, safe
-			if (white && opp > 0) || (!white && opp < 0):
-				print("own piece blocks: %s" % [pos])
+			if (white && opp > 0) or (!white && opp < 0):
 				break
 			if white && (opp == -3 || opp == -4 || opp == -5):
-				print ("1 opp at %s" % pos)
 				return false
-			if !white && (opp == 3 || opp == 4 || opp == 5):
-				print ("2 opp at %s" % pos)
+			if !white and (opp == 3 || opp == 4 || opp == 5):
 				return false
 			pos += dir
 		pos = check_pos
@@ -378,7 +435,6 @@ func is_in_check2(check_pos: Vector2, directions: Array[Vector2]) -> bool:
 		var pos = check_pos
 		pos += dir
 		if (white && board[pos.x][pos.y] == -2) || (!white && board[pos.x][pos.y] == 2):
-			print ("3 opp at %s" % pos)
 			return false
 		pos = check_pos
 		
@@ -388,23 +444,18 @@ func is_in_check2(check_pos: Vector2, directions: Array[Vector2]) -> bool:
 		pos += dir
 		var piece : int = board[pos.x][pos.y]
 		if (white && piece < 0 && pos.x > 0) || (!white && piece > 0 && pos.x < 0):
-			print ("4 opp at %s" % pos)
 			return false
 		pos = check_pos
 		
 	return true
 
 
-func is_mouse_out(mouse_pos: Vector2) -> bool:
-	if (
-		mouse_pos.x < 0 or mouse_pos.x > BOARD_LENGTH 
-		or mouse_pos.y > 0 or mouse_pos.y < -BOARD_LENGTH
-	):
-		return true
-	return false	
-
-
 func display_board() -> void:
+	# The pieces are instantiated children of TextureHolder so they 
+	# will persist across turns unless killed
+	for child in pieces.get_children():
+		child.queue_free()
+	
 	for row in BOARD_SIZE:
 		for col in BOARD_SIZE:
 			# make a temporary sprite; we'll give it a position and a texture
@@ -426,3 +477,6 @@ func display_board() -> void:
 				3: holder.texture = WHITE_BISHOP
 				2: holder.texture = WHITE_KNIGHT
 				1: holder.texture = WHITE_PAWN
+	# display turn marker
+	if white: turn.texture = TURN_WHITE
+	else: turn.texture = TURN_BLACK
