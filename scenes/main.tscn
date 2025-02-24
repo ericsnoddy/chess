@@ -168,6 +168,7 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="2" type="Button" parent="CanvasLayer/black_pieces" groups=["black_pieces"]]
+layout_mode = 0
 offset_right = 100.0
 offset_bottom = 100.0
 theme_override_styles/focus = SubResource("StyleBoxEmpty_wyqly")
@@ -177,6 +178,7 @@ theme_override_styles/pressed = SubResource("StyleBoxTexture_ubd8v")
 theme_override_styles/normal = SubResource("StyleBoxTexture_i8abl")
 
 [node name="3" type="Button" parent="CanvasLayer/black_pieces" groups=["black_pieces"]]
+layout_mode = 0
 offset_left = 100.0
 offset_right = 200.0
 offset_bottom = 100.0
@@ -187,6 +189,7 @@ theme_override_styles/pressed = SubResource("StyleBoxTexture_56vpt")
 theme_override_styles/normal = SubResource("StyleBoxTexture_gasjh")
 
 [node name="4" type="Button" parent="CanvasLayer/black_pieces" groups=["black_pieces"]]
+layout_mode = 0
 offset_left = 200.0
 offset_right = 300.0
 offset_bottom = 100.0
@@ -197,6 +200,7 @@ theme_override_styles/pressed = SubResource("StyleBoxTexture_3bexu")
 theme_override_styles/normal = SubResource("StyleBoxTexture_rot02")
 
 [node name="5" type="Button" parent="CanvasLayer/black_pieces" groups=["black_pieces"]]
+layout_mode = 0
 offset_left = 300.0
 offset_right = 400.0
 offset_bottom = 100.0

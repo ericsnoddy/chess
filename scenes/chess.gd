@@ -58,26 +58,28 @@ var history : Array[Dictionary] = []
 # special handling - en passant, castling etc
 # holds the pos of the captured piece during special moves
 var en_passant : Array[Vector2] = []
-# start and end pos of a rook after a castle
-var castled_rook : Array[Vector2] = []
 # once king moves it is ineligible for castling -> (white moved, black moved)
 var king_moved := {"white" : false, "black" : true }
 # Same for the castling rook, we'll track (white left, white right, black left, black right)
 var rook_moved := {"white left" : false, "black left" : false, "white right" : false, "black right" : false}
 # square getting promoted; dynamically cast so we can take advantage of null
 var promotion_square = null
+# track data for long/short castling
+var castle_type = null
+
+var debug_count : int = 0
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	# bottom-left is [0,0]: see key above for piece values
-	board.append([4, 2, 3, 6, 5, 3, 2, 4])	# white pieces, [0,0] -> [0,7]
+	board.append([4, 2, 3, 5, 6, 3, 2, 4])	# white pieces, [0,0] -> [0,7]
 	board.append([1, 1, 1, 1, 1, 1, 1, 1])	# [1,0] -> [1,7]
 	board.append([0, 0, 0, 0, 0, 0, 0, 0])
 	board.append([0, 0, 0, 0, 0, 0, 0, 0])
 	board.append([0, 0, 0, 0, 0, 0, 0, 0])
 	board.append([0, 0, 0, 0, 0, 0, 0, 0])
 	board.append([-1, -1, -1, -1, -1, -1, -1, -1])
-	board.append([-4, -2, -3, -6, -5, -3, -2, -4])	# [7,0] -> [7,7]
+	board.append([-4, -2, -3, -5, -6, -3, -2, -4])	# [7,0] -> [7,7]
 	
 	# only calls display_board() once on _ready - make sure to call it below in the game loop
 	display_board()
@@ -127,13 +129,13 @@ func _on_button_pressed(button: Node) -> void:
 	
 	# record history before updating board
 	var selected_val = board[promotion_square.x][promotion_square.y]
+	
 	record_history(	selected_piece, 
 					promotion_square, 
 					selected_val, 
 					captured_val, 
 					false, 
-					val, 
-					false
+					val 
 	)
 	# update board. 'white' switched after we landed on promo square, so we 
 	# have to take into account that white == !white when assigning value
@@ -146,6 +148,7 @@ func _on_button_pressed(button: Node) -> void:
 
 
 func display_board() -> void:
+	if history.back(): print(history.back())
 	# The pieces are instantiated children of TextureHolder so they 
 	# will persist across turns unless killed
 	for child in pieces.get_children():
@@ -197,51 +200,86 @@ func set_move(row: int, col: int) -> void:
 		if move.x == row && move.y == col:
 			# val of square before move (captured = 0 if empty)
 			captured_val = board[move.x][move.y]
+			# skip recording history - for castling, it's handled elsewhere
+			var skip_record : bool = false
 			# OK FUCK let's try a match statement and handle individual pieces
 			match board[selected_piece.x][selected_piece.y]:
 				1:
 					if move.x == 7:
 						promote(move)
+						skip_record = true
 				-1:
 					if move.x == 0:
 						promote(move)
-			# value of square at selected move pos
-			var end_pos := Vector2()
+						skip_record = true
+				4: 
+					if selected_piece.x == 0 && selected_piece.y == 0:
+						rook_moved["white left"] = true
+					elif selected_piece.x == 0 && selected_piece.y == 7:
+						rook_moved["white right"] = true
+				-4: 
+					if selected_piece.x == 7 && selected_piece.y == 0:
+						rook_moved["black left"] = true
+					elif selected_piece.x == 7 && selected_piece.y == 7:
+						rook_moved["black right"] = true
+				6:
+					if selected_piece.x == 0 && selected_piece.y == 4:
+						king_moved["white"] = true
+						# if the king moved 2 units he must have castled
+						if move.y == selected_piece.y - 2:
+							castle_type = "long"
+							rook_moved["white left"] = true
+							board[0][0] = 0
+							board[0][3] = 4
+						elif move.y == selected_piece.y + 2:
+							rook_moved["white right"] = true
+							castle_type = "short"
+							board[0][7] = 0
+							board[0][5] = 4
+				-6:
+					if selected_piece.x == 7 && selected_piece.y == 4:
+						king_moved["black"] = true
+						if move.y == selected_piece.y - 2:
+							castle_type = "long"
+							rook_moved["black left"] = true
+							board[7][0] = 0
+							board[7][3] = 4
+						elif move.y == selected_piece.y + 2:
+							castle_type = "short"
+							rook_moved["black right"] = true
+							board[7][7] = 0
+							board[7][5] = 4
+
 			# value of the selected piece
 			var selected_value : int = board[selected_piece.x][selected_piece.y]
-			
-			# SPECIAL MOVE HANDLING
-			# en passant
-			var is_passant: bool = false
-			# castling
-			# if castling, record "short" or "long"
-			var castle_type = null
-			
+			var is_passant : bool = false
 			# update the board to reflect value of the moved piece
 			board[row][col] = selected_value
 			# update the exiting square in board to show empty
 			board[selected_piece.x][selected_piece.y] = 0
 			
 			# add a dictionary of data to move history array
-			record_history(
-				selected_piece,
-				Vector2(row,col),
-				selected_value,
-				captured_val,
-				is_passant,
-				null,
-				castle_type
-			)
-			
-			# change the color / turn
+			if selected_value == abs(1) && (move.x == 0 || move.x == 7):
+				break 	# stop spaghetti code from duping history entry when castling
+			else:
+				record_history(
+					selected_piece,
+					Vector2(row,col),
+					selected_value,
+					captured_val,
+					is_passant,
+					null,
+				)
+			# reset/update game variables
+			is_passant = false
+			castle_type = null
 			white = !white
-			
 			# The pieces are instantiated children of TextureHolder so they 
 			# will persist unless killed - this is handled by display_board()
 			display_board()
 			break
-	# hide possible moves - await next click
 	show_dots(false)
+	
 	# HERE THE PROGRAM "WAITS" FOR ANOTHER INPUT INSTEAD OF REGISTERING LAST 
 	# LEFT CLICK AS DESIRING A NEW SET OF OPTIONS. UNTIL FIXED THE PLAYER MUST
 	# MAKE TWO LEFT-CLICKS TO RESELECT PIECE FOR NEW OPTIONS. FUCK THIS PROBLEM.
@@ -251,9 +289,8 @@ func record_history(start_pos: Vector2,
 					end_pos: Vector2, 
 					selected_value: int, 
 					end_value: int,
-					is_passant: bool = false,
-					promo = null,
-					castle_type = null) -> void:
+					is_passant: bool,
+					promo) -> void:
 	history.append({
 	"start_pos" : start_pos, 
 	"end_pos" : end_pos,
@@ -263,17 +300,6 @@ func record_history(start_pos: Vector2,
 	"promo" : promo, 
 	"castle" : castle_type
 	})
-	
-	# track "has moved" for special rules handling
-	# We don't have to worry about irrelevant pieces triggering this match
-	# because the relevant pieces necessarily have to move first
-	match start_pos:
-		Vector2(0,3) : king_moved["white"] = true
-		Vector2(7,3) : king_moved["black"] = true
-		Vector2(0,0) : rook_moved["white left"] = true
-		Vector2(0,7) : rook_moved["white right"] = true
-		Vector2(7,0) : rook_moved["black left"] = true
-		Vector2(7,7) : rook_moved["black right"] = true
 
 
 func show_options() -> void:
@@ -482,68 +508,36 @@ func get_king_moves(king: Vector2) -> Array[Vector2]:
 		Vector2(1,0), Vector2(1,1), Vector2(0,1), Vector2(-1,1),
 		Vector2(-1,0), Vector2(-1,-1), Vector2(0,-1), Vector2(1,-1)
 	]
-
+	
+	# still need to confirm not in check
 	for dir in directions:
-		var pos : Vector2 = king
-		pos += dir
-		if is_in_bounds(pos) and is_empty(pos) and !is_in_check(pos):
-			_moves.append(pos)
+		var pos : Vector2 = king + dir
+		if is_in_bounds(pos):
+			if is_in_check(pos): break
+			elif is_empty(pos): _moves.append(pos)
+			elif is_opponent(pos): _moves.append(pos)
 	
 	# check castle eligibility and return moves
-	if !is_in_check(king):
-		print("king is not in check")
-		# king can't have already moved
-		if (white && !king_moved["white"]) or (!white && !king_moved["black"]):
-			print("king has not moved")
-			# directions_left[1] and _right[1] have the correct move if castle eligible
-			var directions_left := [Vector2(0,-1), Vector2(0,-2)]
-			var directions_right := [Vector2(0,1), Vector2(0,2), Vector2(0,3)]
-
-			for dir in directions_left:
-				var pos : Vector2 = king
-				pos += dir
-
-				while pos.y >= 0:
-					# rook can't have already moved
-					if (white && rook_moved["white left"]) or (!white && rook_moved["black left"]):
-						print("rook has moved :(")
-						break
-					# spaces between must be empty
-					if !is_empty(pos) && pos.y != 0:
-						print("the spaces are not empty :(")
-						break
-					# cannot castle through check (but don't test the rook)
-					if is_in_check(pos) && pos.y != 0:
-						print("cannot castle through check :(")
-						break
-					# if we arrive to the 0 column and the rook there has not moved
-					# we are golden!
-					if pos.y == 0:
-						print("can castle!")
-						_moves.append(king + directions_left[1])
-						var row = 0 if white else 7
-						castled_rook.append(Vector2(row, 0))
-						break
-					pos += dir
-			
-			for dir in directions_right:
-				var pos : Vector2 = king
-				pos += dir
-
-				while pos.y <= 7:
-					if (white && rook_moved["white right"]) or (!white && rook_moved["black right"]):
-						break
-					if is_in_check(pos) && pos.y != 7: 
-						break
-					if !is_empty(pos) && pos.y != 7:
-						print("the spaces are not empty :(")
-						break
-					if pos.y == 7:
-						_moves.append(king + directions_right[1])
-						var row = 0 if white else 7
-						castled_rook.append(Vector2(row, 7))
-						break
-					pos += dir
+	if white && !king_moved["white"]:
+		if !rook_moved["white left"]:
+			if is_empty(Vector2(0,3)) && !is_in_check(Vector2(0,3)) &&\
+				is_empty(Vector2(0,2)) && !is_in_check(Vector2(0,2)) &&\
+				is_empty(Vector2(0,1)) && !is_in_check(Vector2(0,1)):
+				_moves.append(Vector2(0,2))
+		if !rook_moved["white right"]:
+			if is_empty(Vector2(0,5)) && !is_in_check(Vector2(0,5)) &&\
+				is_empty(Vector2(0,6)) && !is_in_check(Vector2(0,6)):
+				_moves.append(Vector2(0,6))
+	elif !white && !king_moved["black"]:
+		if !rook_moved["black left"]:
+			if is_empty(Vector2(7,3)) && !is_in_check(Vector2(7,3)) &&\
+				is_empty(Vector2(7,2)) && !is_in_check(Vector2(7,2)) &&\
+				is_empty(Vector2(7,1)) && !is_in_check(Vector2(7,1)):
+				_moves.append(Vector2(7,2))
+		if !rook_moved["black right"]:
+			if is_empty(Vector2(7,5)) && !is_in_check(Vector2(7,5)) &&\
+				is_empty(Vector2(7,6)) && !is_in_check(Vector2(7,6)):
+				_moves.append(Vector2(7,6))	
 	return _moves
 
 
