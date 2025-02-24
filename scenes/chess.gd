@@ -51,10 +51,8 @@ var moves := []
 var selected_piece : Vector2
 # Move history... index is turn number, element is dict with move data
 var history : Array[Dictionary] = []
-# holds the pos of the square the capturing piece is moved to, in order to
-# derive location of the captured piece to remove
+# holds the pos of the captured piece during en passant, for special handling
 var en_passant := Vector2()
-
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -81,18 +79,13 @@ func _input(event) -> void:
 				return
 			# nearest whole number / cell width = row/col index
 			# Coords are relative to the CanvasItem, not main display screen
-			# hence why we have to abs() the y-part - we'll use up == +y for rows
+			# hence why we have to abs() the y-part - we'll use up = +y for rows
 			var col : int = snapped(mouse_pos.x, 0) / CELL_WIDTH
 			var row : int = abs(snapped(mouse_pos.y, 0)) / CELL_WIDTH
 			
-			# THIS DOESN'T WORK BECAUSE WE LOSE SELECTED_PIECE 
-			#if selected_piece:
-				#if Vector2(row, col) != selected_piece:
-					##selected_piece = Vector2(row,col)
-					#show_dots(false)
-			# If in selection mode: If it's white's turn and a white piece is selected,
-			# or it's black turn and a black piece is selected:
+			# Route the click depending on the state
 			if state == "selecting":
+				# make sure the selected position is eligible before showing options
 				if (white and board[row][col] > 0) or (!white and board[row][col] < 0):
 					selected_piece = Vector2(row, col)
 					show_options()
@@ -200,10 +193,10 @@ func show_dots(show: bool = true) -> void:
 	# show the dots
 	if show:
 		for move in moves:
+			# we just change the image of a single sprite to draw all the dots
 			var holder := TEXTURE_HOLDER.instantiate()
 			dots.add_child(holder)
 			holder.texture = PIECE_MOVE
-			# (col, row)
 			holder.global_position = Vector2(move.y * CELL_WIDTH + HALF_CELL, -move.x * CELL_WIDTH - HALF_CELL)
 	# delete the dots
 	else:
