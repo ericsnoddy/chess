@@ -1,3 +1,10 @@
+## TODO
+# Stalemates (50 move, same position, etc)
+# is_in_check(pos)
+# checkmate
+# 50 move rule
+# displaying proper move history
+
 extends Sprite2D
 
 const BOARD_SIZE = 8
@@ -199,12 +206,15 @@ func set_move(row: int, col: int) -> void:
 	var just_moved := false
 	for move in moves:
 		# if input coords == a legal move, update the board and record history
+		#
 		if move.x == row && move.y == col:
-			# val of square before move (captured = 0 if empty)
+			# val of ending square before move (captured = 0 if empty)
 			captured_val = board[move.x][move.y]
-			# OK FUCK let's try a match statement and handle individual pieces
+			# OK FUCK let's try a match statement and just handle individual pieces
+			# see if this works for christsakes
 			match board[selected_piece.x][selected_piece.y]:
 				1:
+					# must be a promotion
 					if move.x == 7:
 						promote(move)
 					# en passant
@@ -217,23 +227,19 @@ func set_move(row: int, col: int) -> void:
 						# check if col of eligible pawn matches col of move +
 						# check that we're not moving vertically +
 						# check that row of eligible pawn == starting row of move
+						# There, did I catch all the damn edge cases???
 						if en_passant.y == move.y && selected_piece.y != move.y &&\
 							en_passant.x == selected_piece.x:
 							board[en_passant.x][en_passant.y] = 0
 							is_passant = true
 							captured_val = -1
-						
 				-1:
 					if move.x == 0:
 						promote(move)
 					if move.x == 4 && selected_piece.x == 6:
 						en_passant = move
 						just_moved = true
-					# if we're not the pawn that opened & there is an eligible pawn
 					elif en_passant != null:
-						# check if col of eligible pawn matches col of move +
-						# check that we're not moving vertically +
-						# check that row of eligible pawn == starting row of move
 						if en_passant.y == move.y && selected_piece.y != move.y &&\
 							en_passant.x == selected_piece.x:
 							board[en_passant.x][en_passant.y] = 0
@@ -255,10 +261,10 @@ func set_move(row: int, col: int) -> void:
 						# if the king moved 2 units he must have castled
 						if move.y == selected_piece.y - 2:
 							castle_type = "long"
-							rook_moved["white left"] = true
-							rook_moved["white right"] = true
 							# saves on computation elsewhere to set both rooks to moved
 							# we don't care about their movement anymore after castling
+							rook_moved["white left"] = true
+							rook_moved["white right"] = true
 							board[0][0] = 0
 							board[0][3] = 4
 						elif move.y == selected_piece.y + 2:
@@ -285,7 +291,6 @@ func set_move(row: int, col: int) -> void:
 
 			# value of the selected piece
 			var selected_value : int = board[selected_piece.x][selected_piece.y]
-				
 			# update the board to reflect value of the moved piece
 			board[row][col] = selected_value
 			# update the exiting square in board to show empty
@@ -307,7 +312,7 @@ func set_move(row: int, col: int) -> void:
 			is_passant = false
 			castle_type = null
 			white = !white
-			# The pieces are instantiated children of TextureHolder so they 
+			# The piece sprites are instantiated children of TextureHolder so they 
 			# will persist unless killed - this is handled by display_board()
 			display_board()
 			break
