@@ -28,6 +28,8 @@ const PIECE_MOVE = preload("res://assets/Piece_move.png")
 @onready var pieces := $Pieces
 @onready var dots := $Dots
 @onready var turn := $Turn
+@onready var white_pieces: Control = $"../CanvasLayer/white_pieces"
+@onready var black_pieces: Control = $"../CanvasLayer/black_pieces"
 
 # Positive numbers are white, negative numbers are black; values are:
 # 6 King
@@ -49,6 +51,8 @@ var state : String = "selecting"
 var moves : Array[Vector2] = []
 # pos of currently selected piece
 var selected_piece : Vector2
+# had to make this move history datum global because I'm not clever enough
+var captured_val : int = 0
 # Move history... index is turn number, element is dict with move data
 var history : Array[Dictionary] = []
 # special handling - en passant, castling etc
@@ -77,10 +81,21 @@ func _ready() -> void:
 	
 	# only calls display_board() once on _ready - make sure to call it below in the game loop
 	display_board()
+	
+	# init buttons for corresponding promotion options
+	var white_buttons : Array[Node] = get_tree().get_nodes_in_group("white_pieces")
+	var black_buttons : Array[Node] = get_tree().get_nodes_in_group("black_pieces")
+	
+	# this is cleaner and faster than making a signal for each node
+	for button in white_buttons:
+		button.pressed.connect(self._on_button_pressed.bind(button))
+	for button in black_buttons:
+		button.pressed.connect(self._on_button_pressed.bind(button))
 
 
 func _input(event) -> void:
-	if event is InputEventMouseButton && event.pressed:
+	# (if there's a promotion we don't want to register the selection click here)
+	if event is InputEventMouseButton && event.pressed && promotion_square == null:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			var mouse_pos : Vector2 = get_global_mouse_position()
 			# don't register interaction if mouse is outside area of the board
@@ -104,6 +119,30 @@ func _input(event) -> void:
 				# if another piece is selected before moving, remove dots, change state
 				set_move(row, col)
 				state = "selecting"
+
+
+func _on_button_pressed(button: Node) -> void:
+	# get the piece value from the name and ensure it's 1 char
+	var val : int = int(button.name.substr(0,1))
+	
+	# record history before updating board
+	var selected_val = board[promotion_square.x][promotion_square.y]
+	record_history(	selected_piece, 
+					promotion_square, 
+					selected_val, 
+					captured_val, 
+					false, 
+					val, 
+					false
+	)
+	# update board. 'white' switched after we landed on promo square, so we 
+	# have to take into account that white == !white when assigning value
+	board[promotion_square.x][promotion_square.y] = -val if white else val
+	# hide the promotion buttons
+	white_pieces.visible = false
+	black_pieces.visible = false
+	promotion_square = null
+	display_board()
 
 
 func display_board() -> void:
@@ -156,21 +195,27 @@ func set_move(row: int, col: int) -> void:
 	for move in moves:
 		# if input coords == a legal move, update the board and record history
 		if move.x == row && move.y == col:
+			# val of square before move (captured = 0 if empty)
+			captured_val = board[move.x][move.y]
 			# OK FUCK let's try a match statement and handle individual pieces
 			match board[selected_piece.x][selected_piece.y]:
 				1:
-					if move.x == 7: promote(move)
+					if move.x == 7:
+						promote(move)
 				-1:
-					if move.x == 0: promote(move)
+					if move.x == 0:
+						promote(move)
 			# value of square at selected move pos
 			var end_pos := Vector2()
-			var end_val : int = 0
 			# value of the selected piece
 			var selected_value : int = board[selected_piece.x][selected_piece.y]
 			
 			# SPECIAL MOVE HANDLING
 			# en passant
+			var is_passant: bool = false
 			# castling
+			# if castling, record "short" or "long"
+			var castle_type = null
 			
 			# update the board to reflect value of the moved piece
 			board[row][col] = selected_value
@@ -182,7 +227,10 @@ func set_move(row: int, col: int) -> void:
 				selected_piece,
 				Vector2(row,col),
 				selected_value,
-				end_val
+				captured_val,
+				is_passant,
+				null,
+				castle_type
 			)
 			
 			# change the color / turn
@@ -199,12 +247,21 @@ func set_move(row: int, col: int) -> void:
 	# MAKE TWO LEFT-CLICKS TO RESELECT PIECE FOR NEW OPTIONS. FUCK THIS PROBLEM.
 
 
-func record_history(start_pos: Vector2, end_pos: Vector2, selected_value: int, end_value: int) -> void:
+func record_history(start_pos: Vector2, 
+					end_pos: Vector2, 
+					selected_value: int, 
+					end_value: int,
+					is_passant: bool = false,
+					promo = null,
+					castle_type = null) -> void:
 	history.append({
 	"start_pos" : start_pos, 
 	"end_pos" : end_pos,
 	"piece" : selected_value,
-	"captured" : end_value
+	"captured" : end_value,
+	"is_passant" : is_passant,
+	"promo" : promo, 
+	"castle" : castle_type
 	})
 	
 	# track "has moved" for special rules handling
@@ -490,5 +547,7 @@ func get_king_moves(king: Vector2) -> Array[Vector2]:
 	return _moves
 
 
-func promote(move: Vector2) -> void:
-	pass
+func promote(sq: Vector2) -> void:
+	promotion_square = sq
+	white_pieces.visible = white
+	black_pieces.visible = !white
