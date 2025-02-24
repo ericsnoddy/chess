@@ -60,6 +60,8 @@ var castled_rook : Array[Vector2] = []
 var king_moved := {"white" : false, "black" : true }
 # Same for the castling rook, we'll track (white left, white right, black left, black right)
 var rook_moved := {"white left" : false, "black left" : false, "white right" : false, "black right" : false}
+# square getting promoted; dynamically cast so we can take advantage of null
+var promotion_square = null
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -104,13 +106,36 @@ func _input(event) -> void:
 				state = "selecting"
 
 
-func is_mouse_out(mouse_pos: Vector2) -> bool:
-	if (
-		mouse_pos.x < 0 or mouse_pos.x > BOARD_LENGTH 
-		or mouse_pos.y > 0 or mouse_pos.y < -BOARD_LENGTH
-	):
-		return true
-	return false
+func display_board() -> void:
+	# The pieces are instantiated children of TextureHolder so they 
+	# will persist across turns unless killed
+	for child in pieces.get_children():
+		child.queue_free()
+	
+	for row in BOARD_SIZE:
+		for col in BOARD_SIZE:
+			# make a temporary sprite; we'll give it a position and a texture
+			var holder := TEXTURE_HOLDER.instantiate()
+			pieces.add_child(holder)
+			holder.global_position = Vector2(col * CELL_WIDTH + HALF_CELL, -row * CELL_WIDTH - HALF_CELL)
+			
+			match board[row][col]:
+				-6: holder.texture = BLACK_KING
+				-5: holder.texture = BLACK_QUEEN
+				-4: holder.texture = BLACK_ROOK
+				-3: holder.texture = BLACK_BISHOP
+				-2: holder.texture = BLACK_KNIGHT
+				-1: holder.texture = BLACK_PAWN
+				0: holder.texture = null				
+				6: holder.texture = WHITE_KING
+				5: holder.texture = WHITE_QUEEN
+				4: holder.texture = WHITE_ROOK
+				3: holder.texture = WHITE_BISHOP
+				2: holder.texture = WHITE_KNIGHT
+				1: holder.texture = WHITE_PAWN
+	# display turn marker
+	if white: turn.texture = TURN_WHITE
+	else: turn.texture = TURN_BLACK
 
 
 func get_moves(piece: Vector2) -> Array:
@@ -131,6 +156,12 @@ func set_move(row: int, col: int) -> void:
 	for move in moves:
 		# if input coords == a legal move, update the board and record history
 		if move.x == row && move.y == col:
+			# OK FUCK let's try a match statement and handle individual pieces
+			match board[selected_piece.x][selected_piece.y]:
+				1:
+					if move.x == 7: promote(move)
+				-1:
+					if move.x == 0: promote(move)
 			# value of square at selected move pos
 			var end_pos := Vector2()
 			var end_val : int = 0
@@ -141,20 +172,6 @@ func set_move(row: int, col: int) -> void:
 			# en passant
 			# castling
 			
-			#if is_passant:
-				#end_pos = en_passant
-				#end_val =  board[en_passant.x][en_passant.y]
-				## update board to reflect pawn captured
-				#board[en_passant.x][en_passant.y] = 0
-				#en_passant = Vector2()
-			#elif is_castle:
-				#end_pos = Vector2(row, col)
-				#end_val = 0
-				##board[]
-			#else:
-				#end_pos = Vector2(row,col)
-				#end_val = board[row][col]
-
 			# update the board to reflect value of the moved piece
 			board[row][col] = selected_value
 			# update the exiting square in board to show empty
@@ -226,6 +243,10 @@ func show_dots(show: bool = true) -> void:
 			child.queue_free()
 
 
+func is_empty(coords: Vector2) -> bool:
+	return board[coords.x][coords.y] == 0
+
+
 func is_in_bounds(coords: Vector2) -> bool:
 	# First check that the coords exist (on board)
 	if coords.x >= 0 and coords.x < BOARD_SIZE and coords.y >= 0 and coords.y < BOARD_SIZE:
@@ -233,8 +254,17 @@ func is_in_bounds(coords: Vector2) -> bool:
 	return false
 
 
-func is_empty(coords: Vector2) -> bool:
-	return board[coords.x][coords.y] == 0
+func is_in_check(check_pos: Vector2) -> bool:
+	return false
+
+
+func is_mouse_out(mouse_pos: Vector2) -> bool:
+	if (
+		mouse_pos.x < 0 or mouse_pos.x > BOARD_LENGTH 
+		or mouse_pos.y > 0 or mouse_pos.y < -BOARD_LENGTH
+	):
+		return true
+	return false
 
 
 func is_opponent(coords: Vector2) -> bool:
@@ -460,38 +490,5 @@ func get_king_moves(king: Vector2) -> Array[Vector2]:
 	return _moves
 
 
-# Can input any position parameter to see if that position is in check
-func is_in_check(check_pos: Vector2) -> bool:
-	return false
-
-
-func display_board() -> void:
-	# The pieces are instantiated children of TextureHolder so they 
-	# will persist across turns unless killed
-	for child in pieces.get_children():
-		child.queue_free()
-	
-	for row in BOARD_SIZE:
-		for col in BOARD_SIZE:
-			# make a temporary sprite; we'll give it a position and a texture
-			var holder := TEXTURE_HOLDER.instantiate()
-			pieces.add_child(holder)
-			holder.global_position = Vector2(col * CELL_WIDTH + HALF_CELL, -row * CELL_WIDTH - HALF_CELL)
-			
-			match board[row][col]:
-				-6: holder.texture = BLACK_KING
-				-5: holder.texture = BLACK_QUEEN
-				-4: holder.texture = BLACK_ROOK
-				-3: holder.texture = BLACK_BISHOP
-				-2: holder.texture = BLACK_KNIGHT
-				-1: holder.texture = BLACK_PAWN
-				0: holder.texture = null				
-				6: holder.texture = WHITE_KING
-				5: holder.texture = WHITE_QUEEN
-				4: holder.texture = WHITE_ROOK
-				3: holder.texture = WHITE_BISHOP
-				2: holder.texture = WHITE_KNIGHT
-				1: holder.texture = WHITE_PAWN
-	# display turn marker
-	if white: turn.texture = TURN_WHITE
-	else: turn.texture = TURN_BLACK
+func promote(move: Vector2) -> void:
+	pass
