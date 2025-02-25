@@ -58,6 +58,9 @@ var history : Array[Dictionary] = []
 # had to make this move history datum global because I'm not clever enough
 var captured_val : int = 0
 # special handling 
+# kings' up-to-date position
+var white_king_pos := Vector2(0,4)
+var black_king_pos := Vector2(7,4)
 # once king moves it is ineligible for castling
 var king_moved := {"white" : false, "black" : true}
 # Same for the castling rook
@@ -291,13 +294,13 @@ func set_move(row: int, col: int) -> void:
 			board[selected_piece.x][selected_piece.y] = 0
 			
 			# add a dictionary of data to history array
-			# but not if promoting -- record is called elsewhere
+			# but not if promoting -- record is called in that loop
 			if (white && move.x == 7) or (!white && move.x == 0):
 				pass
 			else:
 				record_history(
 					selected_piece,
-					Vector2(row,col),
+					move,
 					selected_value,
 					captured_val,
 					is_passant,
