@@ -39,26 +39,21 @@ const PIECE_MOVE = preload("res://assets/Piece_move.png")
 @onready var black_pieces: Control = $"../CanvasLayer/black_pieces"
 
 # Positive numbers are white, negative numbers are black; values are:
-# 6 King
-# 5 Queen
-# 4 Rook
-# 3 Bishop
-# 2 Knight
-# 1 Pawn
-# 0 (empty square)
-
+# 6 King 5 Queen 4 Rook 3 Bishop 2 Knight 1 Pawn 0 (empty square)
 # variables
 # hold the position of a piece: board[0][0] is index of piece at [0,0]
 var board : Array
 # white's turn = true, black's turn = false
 var white : bool = true
-# Two states for the player: "selecting" and "confirming"
+# Two states for the player: false == "selecting" and true == "confirming"
 var state : String = "selecting"
 # hold possible moves for currently selected piece
 var moves : Array[Vector2] = []
+# move number
+var move_number : int = 0
 # pos of currently selected piece
 var selected_piece : Vector2
-# Move history... see record_history(...) for keys/parameters
+# Move history management... see record_history(...) for keys/parameters
 var history : Array[Dictionary] = []
 # had to make this move history datum global because I'm not clever enough
 var captured_val : int = 0
@@ -76,6 +71,8 @@ var is_passant : bool = false
 # square getting promoted; dynamically cast so we can take advantage of null
 var promotion_square = null
 
+# debug overlay
+var debug: Debug
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -102,33 +99,31 @@ func _ready() -> void:
 	for button in black_buttons:
 		button.pressed.connect(self._on_button_pressed.bind(button))
 
-
 func _input(event) -> void:
 	# (if there's a promotion we don't want to register the selection click here)
 	if event is InputEventMouseButton && event.pressed && promotion_square == null:
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			var mouse_pos : Vector2 = get_global_mouse_position()
 			# don't register interaction if mouse is outside area of the board
-			if is_mouse_out(mouse_pos): 
+			if is_mouse_out(): 
 				return
 			# nearest whole number / cell width = row/col index
 			# Coords are relative to the CanvasItem, not main display screen
 			# hence why we have to abs() the y-part - we'll use up = +y for rows
+			var mouse_pos : Vector2 = get_global_mouse_position()
 			var col : int = snapped(mouse_pos.x, 0) / CELL_WIDTH
 			var row : int = abs(snapped(mouse_pos.y, 0)) / CELL_WIDTH
 			
 			# Route the click depending on the state
-			if state == "selecting":
-				# make sure the selected position is eligible before showing options
-				if (white and board[row][col] > 0) or (!white and board[row][col] < 0):
-					selected_piece = Vector2(row, col)
-					show_options()
-					state = "confirming"
+			# make sure the selected position is eligible before showing options
+			if state == "selecting" && (white && board[row][col] > 0 || !white && board[row][col] < 0):
+				selected_piece = Vector2(row, col)
+				show_options()
+				state = "confirming"
+
 			# if options are shown we check if option is taken and then move if so
 			elif state == "confirming":
 				# if another piece is selected before moving, remove dots, change state
 				set_move(row, col)
-				state = "selecting"
 
 
 func _on_button_pressed(button: Node) -> void:
@@ -136,15 +131,14 @@ func _on_button_pressed(button: Node) -> void:
 	var val : int = int(button.name.substr(0,1))
 	
 	# record history before updating board
-	var selected_val = board[promotion_square.x][promotion_square.y]
-	
 	record_history(	selected_piece, 
 					promotion_square, 
-					selected_val, 
+					board[promotion_square.x][promotion_square.y], 
 					captured_val, 
 					false, 
 					val 
 	)
+	print(history.back())
 	# update board. 'white' switched after we landed on promo square, so we 
 	# have to take into account that white == !white when assigning value
 	board[promotion_square.x][promotion_square.y] = -val if white else val
@@ -156,7 +150,6 @@ func _on_button_pressed(button: Node) -> void:
 
 
 func display_board() -> void:
-	if history.back(): print(history.back())
 	# The pieces are instantiated children of TextureHolder so they 
 	# will persist across turns unless killed
 	for child in pieces.get_children():
@@ -165,7 +158,7 @@ func display_board() -> void:
 	for row in BOARD_SIZE:
 		for col in BOARD_SIZE:
 			# make a temporary sprite; we'll give it a position and a texture
-			var holder := TEXTURE_HOLDER.instantiate()
+			var holder : Sprite2D = TEXTURE_HOLDER.instantiate()
 			pieces.add_child(holder)
 			holder.global_position = Vector2(col * CELL_WIDTH + HALF_CELL, -row * CELL_WIDTH - HALF_CELL)
 			
@@ -176,13 +169,14 @@ func display_board() -> void:
 				-3: holder.texture = BLACK_BISHOP
 				-2: holder.texture = BLACK_KNIGHT
 				-1: holder.texture = BLACK_PAWN
-				0: holder.texture = null				
+				0: holder.texture = null
 				6: holder.texture = WHITE_KING
 				5: holder.texture = WHITE_QUEEN
 				4: holder.texture = WHITE_ROOK
 				3: holder.texture = WHITE_BISHOP
 				2: holder.texture = WHITE_KNIGHT
 				1: holder.texture = WHITE_PAWN
+				
 	# display turn marker
 	if white: turn.texture = TURN_WHITE
 	else: turn.texture = TURN_BLACK
@@ -295,9 +289,13 @@ func set_move(row: int, col: int) -> void:
 			board[row][col] = selected_value
 			# update the exiting square in board to show empty
 			board[selected_piece.x][selected_piece.y] = 0
-			# add a dictionary of data to move history array
-			if selected_value == abs(1) && (move.x == 0 || move.x == 7):
-				break 	# stop spaghetti code from duping history entry when castling
+			
+			# add a dictionary of data to history array
+			# but not if promoting -- record is called elsewhere
+			if white && move.x == 7:
+				pass
+			elif !white && move.x == 0:
+				pass
 			else:
 				record_history(
 					selected_piece,
@@ -307,6 +305,8 @@ func set_move(row: int, col: int) -> void:
 					is_passant,
 					null,
 				)
+				print(history.back())
+				
 			# reset/update game variables
 			if !just_moved: en_passant = null
 			is_passant = false
@@ -317,24 +317,30 @@ func set_move(row: int, col: int) -> void:
 			display_board()
 			break
 	show_dots(false)
+	state = "selecting"
 	
-	# HERE THE PROGRAM "WAITS" FOR ANOTHER INPUT INSTEAD OF REGISTERING THE LAST 
-	# LEFT CLICK AS DESIRING A NEW SET OF OPTIONS. UNTIL FIXED THE PLAYER MUST
-	# MAKE TWO LEFT-CLICKS TO RESELECT PIECE FOR NEW OPTIONS. FUCK THIS PROBLEM.
-
+	# one-click reselect functionality
+	if (selected_piece.x != row || selected_piece.y != col) && (white && board[row][col] > 0 || !white && board[row][col] < 0):
+		selected_piece = Vector2(row, col)
+		show_options()
+		state = "confirming"
 
 func record_history(start_pos: Vector2, 
 					end_pos: Vector2, 
 					selected_value: int, 
 					end_value: int,
-					is_passant: bool,
+					passant: bool,
 					promo) -> void:
+	# increment move
+	move_number += 1
+	
 	history.append({
+	"move" : move_number,
 	"start_pos" : start_pos, 
 	"end_pos" : end_pos,
 	"piece" : selected_value,
 	"captured" : end_value,
-	"is_passant" : is_passant,
+	"is_passant" : passant,
 	"promo" : promo, 
 	"castle" : castle_type
 	})
@@ -349,9 +355,9 @@ func show_options() -> void:
 	show_dots()
 
 
-func show_dots(show: bool = true) -> void:
+func show_dots(to_show: bool = true) -> void:
 	# show the dots
-	if show:
+	if to_show:
 		for move in moves:
 			# we just change the image of a single sprite to draw all the dots
 			var holder := TEXTURE_HOLDER.instantiate()
@@ -375,17 +381,14 @@ func is_in_bounds(coords: Vector2) -> bool:
 	return false
 
 
-func is_in_check(check_pos: Vector2) -> bool:
+func is_in_check(_check_pos: Vector2) -> bool:
 	return false
 
 
-func is_mouse_out(mouse_pos: Vector2) -> bool:
-	if (
-		mouse_pos.x < 0 or mouse_pos.x > BOARD_LENGTH 
-		or mouse_pos.y > 0 or mouse_pos.y < -BOARD_LENGTH
-	):
-		return true
-	return false
+func is_mouse_out() -> bool:
+	if get_rect().has_point(to_local(get_global_mouse_position())):
+		return false
+	return true
 
 
 func is_opponent(coords: Vector2) -> bool:
