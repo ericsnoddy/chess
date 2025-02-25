@@ -292,9 +292,7 @@ func set_move(row: int, col: int) -> void:
 			
 			# add a dictionary of data to history array
 			# but not if promoting -- record is called elsewhere
-			if white && move.x == 7:
-				pass
-			elif !white && move.x == 0:
+			if (white && move.x == 7) or (!white && move.x == 0):
 				pass
 			else:
 				record_history(
