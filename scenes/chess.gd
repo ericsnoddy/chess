@@ -379,7 +379,54 @@ func is_in_bounds(coords: Vector2) -> bool:
 	return false
 
 
-func is_in_check(_check_pos: Vector2) -> bool:
+func is_in_check(check_pos: Vector2) -> bool:
+	var directions : Array[Vector2] = [
+		Vector2(1,0), Vector2(1,1), Vector2(0,1), Vector2(-1,1),
+		Vector2(-1,0), Vector2(-1,-1), Vector2(0,-1), Vector2(1,-1)
+	]
+	# Test Pawns -- when they are pos + (direction, +/- 1)
+	var pawn_dir = 1 if white else -1
+	var pawn_attacks : Array[Vector2] = [
+		check_pos + Vector2(pawn_dir, -1),
+		check_pos + Vector2(pawn_dir, 1)
+	]
+	# simple diagonal
+	for p in pawn_attacks:
+		if is_in_bounds(p):
+			if (white && board[p.x][p.y] == -1) or (!white && board[p.x][p.y] == 1):
+				return true
+	
+	# # simple king check
+	for dir in directions:
+		var pos = check_pos + dir
+		if is_in_bounds(pos):
+			if white && board[pos.x][pos.y] == -6 || !white && board[pos.x][pos.y] == 6: return true
+	
+	# checking long range opponents in all directions
+	for dir in directions:
+		var pos = check_pos + dir
+		while is_in_bounds(pos):
+			if !is_empty(pos):
+				var piece = board[pos.x][pos.y]
+				# vertical/horizontal - if we encounter a rook or queen it's a check
+				if (dir.x == 0 || dir.y == 0) && (white && piece in [-4, -5] || !white && piece in [4, 5]):
+					return true
+				# diagonal - if we encounter a bishop or queen
+				elif (dir.x != 0 && dir.y != 0) && (white && piece in [-3, -5] || !white && piece in [3, 5]):
+					return true
+				break
+			pos += dir
+	
+	# KNIGHT
+	directions = [Vector2(2, 1), Vector2(2, -1), Vector2(1, 2), Vector2(1, -2),
+	Vector2(-2, 1), Vector2(-2, -1), Vector2(-1, 2), Vector2(-1, -2)]
+	
+	for dir in directions:
+		var pos = check_pos + dir
+		if is_in_bounds(pos):
+			if (white && board[pos.x][pos.y] == -2) or (!white && board[pos.x][pos.y] == 2):
+				return true
+	
 	return false
 
 
@@ -541,9 +588,9 @@ func get_king_moves(king: Vector2) -> Array[Vector2]:
 	for dir in directions:
 		var pos : Vector2 = king + dir
 		if is_in_bounds(pos):
-			if is_in_check(pos): break
-			elif is_empty(pos): _moves.append(pos)
-			elif is_opponent(pos): _moves.append(pos)
+			if !is_in_check(pos):
+				if is_empty(pos): _moves.append(pos)
+				elif is_opponent(pos): _moves.append(pos)
 	
 	# check castle eligibility and return moves
 	if white && !king_moved["white"]:
