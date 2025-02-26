@@ -337,7 +337,7 @@ func set_move(row: int, col: int) -> void:
 		state = "confirming"
 
 
-func record_history(start_pos: Vector2, end_pos: Vector2, selected_value: int, end_value: int, passant: bool, promo) -> void:
+func record_history(start_pos: Vector2, end_pos: Vector2, piece_val: int, capture_val: int, passant: bool, promo) -> void:
 	# increment move
 	move_number += 1
 	
@@ -345,8 +345,8 @@ func record_history(start_pos: Vector2, end_pos: Vector2, selected_value: int, e
 	"move" : move_number,
 	"start_pos" : start_pos, 
 	"end_pos" : end_pos,
-	"piece" : selected_value,
-	"captured" : end_value,
+	"piece" : piece_val,
+	"captured" : capture_val,
 	"is_passant" : passant,
 	"promo" : promo, 
 	"castle" : castle_type
