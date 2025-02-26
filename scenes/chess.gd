@@ -1,17 +1,19 @@
+extends Sprite2D
+
 ## TODO
+# blocking out of check
 # Stalemates (50 move, same position, etc)
-# is_in_check(pos)
+# check - can only move the king
 # checkmate
 # 50 move rule
 # displaying proper move history
-
-extends Sprite2D
 
 const BOARD_SIZE = 8
 const CELL_WIDTH = 18
 const HALF_CELL = CELL_WIDTH / 2
 const BOARD_LENGTH = CELL_WIDTH * 8
 
+# empty Sprite2D to display the pieces
 const TEXTURE_HOLDER = preload("res://scenes/texture_holder.tscn")
 
 # preload images
@@ -57,7 +59,8 @@ var selected_piece : Vector2
 var history : Array[Dictionary] = []
 # had to make this move history datum global because I'm not clever enough
 var captured_val : int = 0
-# special handling 
+
+# SPECIAL HANDLING
 # kings' up-to-date position
 var white_king_pos := Vector2(0,4)
 var black_king_pos := Vector2(7,4)
@@ -73,9 +76,6 @@ var en_passant = null
 var is_passant : bool = false
 # square getting promoted; dynamically cast so we can take advantage of null
 var promotion_square = null
-
-# debug overlay
-var debug: Debug
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -101,6 +101,7 @@ func _ready() -> void:
 		button.pressed.connect(self._on_button_pressed.bind(button))
 	for button in black_buttons:
 		button.pressed.connect(self._on_button_pressed.bind(button))
+
 
 func _input(event) -> void:
 	# (if there's a promotion we don't want to register the selection click here)
@@ -134,7 +135,7 @@ func _on_button_pressed(button: Node) -> void:
 	var val : int = int(button.name.substr(0,1))
 	
 	# record history before updating board
-	record_history(	selected_piece, 
+	record_history( selected_piece, 
 					promotion_square, 
 					board[promotion_square.x][promotion_square.y], 
 					captured_val, 
@@ -148,6 +149,7 @@ func _on_button_pressed(button: Node) -> void:
 	# hide the promotion buttons
 	white_pieces.visible = false
 	black_pieces.visible = false
+	# reset the promotion square - this is how we hi-jacked LEFT_CLICK
 	promotion_square = null
 	display_board()
 
@@ -164,7 +166,7 @@ func display_board() -> void:
 			var holder : Sprite2D = TEXTURE_HOLDER.instantiate()
 			pieces.add_child(holder)
 			holder.global_position = Vector2(col * CELL_WIDTH + HALF_CELL, -row * CELL_WIDTH - HALF_CELL)
-			
+	
 			match board[row][col]:
 				-6: holder.texture = BLACK_KING
 				-5: holder.texture = BLACK_QUEEN
@@ -179,7 +181,7 @@ func display_board() -> void:
 				3: holder.texture = WHITE_BISHOP
 				2: holder.texture = WHITE_KNIGHT
 				1: holder.texture = WHITE_PAWN
-				
+	
 	# display turn marker
 	if white: turn.texture = TURN_WHITE
 	else: turn.texture = TURN_BLACK
@@ -200,10 +202,11 @@ func get_moves(piece: Vector2) -> Array:
 
 
 func set_move(row: int, col: int) -> void:
-	var just_moved := false
+	# en passant eligibility
+	var pawn_just_moved := false
+	
+	# if input coords == a legal move: update board, record history, reset
 	for move in moves:
-		# if input coords == a legal move, update the board and record history
-		#
 		if move.x == row && move.y == col:
 			# val of ending square before move (captured = 0 if empty)
 			captured_val = board[move.x][move.y]
@@ -211,23 +214,25 @@ func set_move(row: int, col: int) -> void:
 			# see if this works for christsakes
 			match board[selected_piece.x][selected_piece.y]:
 				1:
-					# must be a promotion
+					# pawn promotion
 					if move.x == 7:
 						promote(move)
 					# en passant
 					# mark our pawn as eligible to be captured by en passant
 					if move.x == 3 && selected_piece.x == 1:
 						en_passant = move
-						just_moved = true
-					# if we're not the pawn that opened & there is an eligible pawn
+						pawn_just_moved = true
+					# if we're a different pawn & one is eligible to capture by passant...
+					# let's see if we can capture it
 					elif en_passant != null:
 						# check if col of eligible pawn matches col of move +
 						# check that we're not moving vertically +
 						# check that row of eligible pawn == starting row of move
 						# There, did I catch all the damn edge cases???
-						if en_passant.y == move.y && selected_piece.y != move.y &&\
-							en_passant.x == selected_piece.x:
+						if en_passant.y == move.y && selected_piece.y != move.y \
+							&& en_passant.x == selected_piece.x:
 							board[en_passant.x][en_passant.y] = 0
+							# data for move history
 							is_passant = true
 							captured_val = -1
 				-1:
@@ -235,14 +240,14 @@ func set_move(row: int, col: int) -> void:
 						promote(move)
 					if move.x == 4 && selected_piece.x == 6:
 						en_passant = move
-						just_moved = true
+						pawn_just_moved = true
 					elif en_passant != null:
-						if en_passant.y == move.y && selected_piece.y != move.y &&\
-							en_passant.x == selected_piece.x:
+						if en_passant.y == move.y && selected_piece.y != move.y \
+							&& en_passant.x == selected_piece.x:
 							board[en_passant.x][en_passant.y] = 0
 							is_passant = true
 							captured_val = 1
-				4: 
+				4:  # we need to know if rooks moved for castling eligibility
 					if selected_piece.x == 0 && selected_piece.y == 0:
 						rook_moved["white left"] = true
 					elif selected_piece.x == 0 && selected_piece.y == 7:
@@ -253,9 +258,9 @@ func set_move(row: int, col: int) -> void:
 					elif selected_piece.x == 7 && selected_piece.y == 7:
 						rook_moved["black right"] = true
 				6:
+					# castling
 					if selected_piece.x == 0 && selected_piece.y == 4:
-						king_moved["white"] = true
-						
+						king_moved["white"] = true						
 						# if the king moved 2 units he must have castled
 						if move.y == selected_piece.y - 2:
 							castle_type = "long"
@@ -314,7 +319,7 @@ func set_move(row: int, col: int) -> void:
 				print(history.back())
 				
 			# reset/update game variables
-			if !just_moved: en_passant = null
+			if !pawn_just_moved: en_passant = null
 			is_passant = false
 			castle_type = null
 			white = !white
@@ -331,12 +336,8 @@ func set_move(row: int, col: int) -> void:
 		show_options()
 		state = "confirming"
 
-func record_history(start_pos: Vector2, 
-					end_pos: Vector2, 
-					selected_value: int, 
-					end_value: int,
-					passant: bool,
-					promo) -> void:
+
+func record_history(start_pos: Vector2, end_pos: Vector2, selected_value: int, end_value: int, passant: bool, promo) -> void:
 	# increment move
 	move_number += 1
 	
