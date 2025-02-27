@@ -563,8 +563,15 @@ func get_knight_moves(knight: Vector2) -> Array[Vector2]:
 				# reverse
 				board[pos.x][pos.y] == 0
 				board[knight.x][knight.y] == 2 if white else -2
-			elif is_opponent(pos): 
-				_moves.append(pos)
+			elif is_opponent(pos):
+				var temp = board[pos.x][pos.y]
+				board[pos.x][pos.y] == 2 if white else -2
+				board[knight.x][knight.y] == 0
+				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] == temp
+				board[knight.x][knight.y] == 2 if white else -2
 		pos = knight
 	return _moves
 
@@ -589,7 +596,14 @@ func get_bishop_moves(bishop: Vector2) -> Array[Vector2]:
 				board[pos.x][pos.y] == 0
 				board[bishop.x][bishop.y] == 3 if white else -3
 			elif is_opponent(pos):
-				_moves.append(pos)
+				var temp = board[pos.x][pos.y]
+				board[pos.x][pos.y] == 3 if white else -3
+				board[bishop.x][bishop.y] == 0
+				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] == temp
+				board[bishop.x][bishop.y] == 3 if white else -3
 				break
 			else:
 				break
@@ -619,7 +633,14 @@ func get_rook_moves(rook: Vector2) -> Array[Vector2]:
 				board[pos.x][pos.y] == 0
 				board[rook.x][rook.y] == 4 if white else -4
 			elif is_opponent(pos):
-				_moves.append(pos)
+				var temp = board[pos.x][pos.y]
+				board[pos.x][pos.y] == 4 if white else -4
+				board[rook.x][rook.y] == 0
+				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] == temp
+				board[rook.x][rook.y] == 4 if white else -4
 				break
 			# All valid moves exhausted, check the next direction
 			else:
@@ -651,7 +672,14 @@ func get_queen_moves(queen: Vector2) -> Array[Vector2]:
 				board[pos.x][pos.y] == 0
 				board[queen.x][queen.y] == 5 if white else -5
 			elif is_opponent(pos):
-				_moves.append(pos)
+				var temp = board[pos.x][pos.y]
+				board[pos.x][pos.y] == 5 if white else -5
+				board[queen.x][queen.y] == 0
+				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] == temp
+				board[queen.x][queen.y] == 5 if white else -5
 				break
 			else:
 				break
