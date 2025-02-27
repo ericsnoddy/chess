@@ -1,12 +1,14 @@
 extends Sprite2D
 
 ## TODO
-# blocking out of check
-# Stalemates (50 move, same position, etc)
-# check - can only move the king
-# checkmate
-# 50 move rule
+# Stop the game when it's over
+# Stalemate: the player to move is not in check and has no legal move
+# obvious ones: KvK, KvKB, KvKN, blocked pos where only preceding pieces can move
+# Indicate check
+# checkmate - indicate checkmate
 # displaying proper move history
+# Resignation / offer draw
+# if opponent resigns but game is dead position: actually a draw
 
 const BOARD_SIZE = 8
 const CELL_WIDTH = 18
@@ -76,6 +78,17 @@ var en_passant = null
 var is_passant : bool = false
 # square getting promoted; dynamically cast so we can take advantage of null
 var promotion_square = null
+# 50 move rule - no captures within 50 moves = draw
+var fifty_moves : int = 0
+# threefold rule - 3 non-unique boards = can offer draw on or after 3rd unique
+# fivefold rule - automatic draw
+# Positions are considered the same if
+	#(1) the same player has the move,
+	#(2) pieces of the same kind and color occupy the same squares, and
+	#(3) the possible moves of all the pieces are the same.
+var unique_board_moves: Array = []
+var num_unique_moves: Array = []
+
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -140,9 +153,13 @@ func _on_button_pressed(button: Node) -> void:
 					board[promotion_square.x][promotion_square.y], 
 					captured_val, 
 					false, 
-					val 
+					val,
 	)
 	print(history.back())
+	# incrememnt the fifty moves counter if appropriate
+	incr_fifty_moves()
+	check_unique_board(board[promotion_square.x][promotion_square.y])
+	
 	# update board. 'white' switched after we landed on promo square, so we 
 	# have to take into account that white == !white when assigning value
 	board[promotion_square.x][promotion_square.y] = -val if white else val
@@ -152,6 +169,13 @@ func _on_button_pressed(button: Node) -> void:
 	# reset the promotion square - this is how we hi-jacked LEFT_CLICK
 	promotion_square = null
 	display_board()
+
+
+func incr_fifty_moves() -> void:
+	if captured_val == 0:
+		fifty_moves += 1
+	else:
+		fifty_moves = 0
 
 
 func display_board() -> void:
@@ -317,8 +341,10 @@ func set_move(row: int, col: int) -> void:
 					null,
 				)
 				print(history.back())
-				print(king_moved)
-				print(rook_moved)
+			# increment 50 moves counter if appropriate
+			incr_fifty_moves()
+			# three/fivefold rule
+			check_unique_board(board)
 				
 			# reset/update game variables
 			if !pawn_just_moved: en_passant = null
@@ -337,6 +363,9 @@ func set_move(row: int, col: int) -> void:
 		selected_piece = Vector2(row, col)
 		show_options()
 		state = "confirming"
+	
+	if is_fifty_moves(): print("DRAW: 50 moves rule")
+	elif is_dead_position(): print("DRAW: Insufficient material")
 
 
 func record_history(start_pos: Vector2, end_pos: Vector2, piece_val: int, capture_val: int, passant: bool, promo) -> void:
@@ -378,6 +407,41 @@ func show_dots(to_show: bool = true) -> void:
 		for child in dots.get_children():
 			child.queue_free()
 
+
+func check_unique_board(board_to_check: Array) -> void:
+	for b in unique_board_moves:
+		if board_to_check == unique_board_moves[b]:
+			num_unique_moves[b] += 1
+			if num_unique_moves[b] == 5:
+				print("DRAW: Fivefold repetition rule")
+			elif num_unique_moves[b] >= 3:
+				print("DRAW? Threefold repetition rule")
+			return
+	unique_board_moves.append(board_to_check.duplicate(true))
+	num_unique_moves.append(1)
+
+
+func is_dead_position() -> bool:
+	# we know there's a dead position when insufficent material
+	var white_piece = 0
+	var black_piece = 0
+	
+	for i in BOARD_SIZE:
+		for j in BOARD_SIZE:
+			match board[i][j]:
+				2, 3:
+					if white_piece == 0: white_piece += 1
+					else: return false
+				-2, -3:
+					if black_piece == 0: black_piece += 1
+					else: return false
+				6, -6, 0: pass
+				_: return false
+	return true
+
+
+func is_fifty_moves() -> bool:
+	return fifty_moves >= 50
 
 func is_empty(coords: Vector2) -> bool:
 	return board[coords.x][coords.y] == 0
