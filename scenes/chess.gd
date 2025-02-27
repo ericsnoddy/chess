@@ -409,7 +409,7 @@ func show_dots(to_show: bool = true) -> void:
 
 
 func check_unique_board(board_to_check: Array) -> void:
-	for b in unique_board_moves:
+	for b in unique_board_moves.size():
 		if board_to_check == unique_board_moves[b]:
 			num_unique_moves[b] += 1
 			if num_unique_moves[b] == 5:
