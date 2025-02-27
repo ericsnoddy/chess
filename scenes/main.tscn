@@ -210,5 +210,14 @@ theme_override_styles/hover = SubResource("StyleBoxTexture_g8nuo")
 theme_override_styles/pressed = SubResource("StyleBoxTexture_5gl8y")
 theme_override_styles/normal = SubResource("StyleBoxTexture_65qkq")
 
+[node name="CanvasLayer2" type="CanvasLayer" parent="."]
+
+[node name="OfferDraw" type="Label" parent="CanvasLayer2"]
+visible = false
+offset_right = 256.0
+offset_bottom = 64.0
+theme_override_font_sizes/font_size = 39
+text = "Accept Draw?"
+
 [node name="Board" parent="." instance=ExtResource("1_y8b70")]
 position = Vector2(72, -72)
