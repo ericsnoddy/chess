@@ -65,7 +65,7 @@ var captured_val : int = 0
 var white_king_pos := Vector2(0,4)
 var black_king_pos := Vector2(7,4)
 # once king moves it is ineligible for castling
-var king_moved := {"white" : false, "black" : true}
+var king_moved := {"white" : false, "black" : false}
 # Same for the castling rook
 var rook_moved := {"white left" : false, "black left" : false, "white right" : false, "black right" : false}
 # track data for long/short castling
@@ -187,9 +187,9 @@ func display_board() -> void:
 	else: turn.texture = TURN_BLACK
 
 
-func get_moves(piece: Vector2) -> Array:
+func get_moves(selected: Vector2) -> Array:
 	var valid_moves : Array[Vector2] = []
-	var target : int = board[piece.x][piece.y]
+	var target : int = board[selected.x][selected.y]
 	# Remember vars are relative to the Array so here x is the ROW not the column
 	match abs(target):
 		1: valid_moves = get_pawn_moves(selected_piece)
@@ -286,13 +286,13 @@ func set_move(row: int, col: int) -> void:
 							rook_moved["black left"] = true
 							rook_moved["black right"] = true
 							board[7][0] = 0
-							board[7][3] = 4
+							board[7][3] = -4
 						elif move.y == selected_piece.y + 2:
 							castle_type = "short"
 							rook_moved["black left"] = true
 							rook_moved["black right"] = true
 							board[7][7] = 0
-							board[7][5] = 4
+							board[7][5] = -4
 					# track the black king
 					black_king_pos = Vector2(move.x, move.y)
 	
@@ -317,6 +317,8 @@ func set_move(row: int, col: int) -> void:
 					null,
 				)
 				print(history.back())
+				print(king_moved)
+				print(rook_moved)
 				
 			# reset/update game variables
 			if !pawn_just_moved: en_passant = null
@@ -469,41 +471,73 @@ func get_pawn_moves(pawn: Vector2) -> Array[Vector2]:
 	var _moves : Array[Vector2] = []
 	var direction : Vector2
 	var is_first_move : bool = false
-	var pos : Vector2 = pawn
 	
 	# get direction of movement
 	if white: direction = Vector2(1,0)
 	else: direction = Vector2(-1,0)
 	
 	# if pawn hasn't moved, can move 1 or 2 spaces
-	if (white && pos.x == 1) or (!white && pos.x == 6):
+	if (white && pawn.x == 1) or (!white && pawn.x == 6):
 		is_first_move = true
 		
 	# en passant
 	# if there are eligible captures and the pawn is on an eligible row
 	# and the opponent is exactly 1 col away, we can add the move
-	if en_passant != null && (white && selected_piece.x == 4 || !white && selected_piece.x == 3) &&\
-		abs(en_passant.y - selected_piece.y) == 1:
+	if en_passant != null && (white && pawn.x == 4 || !white && pawn.x == 3) && abs(en_passant.y - pawn.y) == 1:
+		var pos := pawn + direction
+		# # We temporarily move the pawns around the board in order to
+		# check if moving them will put our king in check. If not: OK
+		board[pos.x][pos.y] == 1 if white else -1
+		board[pawn.x][pawn.y] == 0
+		board[en_passant.x][en_passant.y] = 0
+		if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+			_moves.append(pos)
+		# reverse
+		board[pos.x][pos.y] == 0
+		board[pawn.x][pawn.y] == 1 if white else -1
+		board[en_passant.x][en_passant.y] = -1 if white else 1
 		# the move will be the capture space + vertical direction determined by color
 		_moves.append(en_passant + direction)
 	
-	# check vertical
-	pos += direction
-	if is_in_bounds(pos) && is_empty(pos):
-		_moves.append(pos)
-		if is_first_move:
-			pos += direction
-			# it can't be out of bounds if it's the first move
-			if is_empty(pos):
+	# check verticals
+	var pos := pawn + direction
+	if is_empty(pos): 
+		# We temporarily move the pawn around the board in order to
+		# check if moving it will put our king in check. If not: OK
+		board[pos.x][pos.y] == 1 if white else -1
+		board[pawn.x][pawn.y] == 0
+		if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+			_moves.append(pos)
+		# reverse
+		board[pos.x][pos.y] == 0
+		board[pawn.x][pawn.y] == 1 if white else -1
+	
+	if is_first_move:
+		pos = pawn + direction * 2
+		if is_empty(pawn + direction) && is_empty(pos):
+			# We temporarily move the pawn around the board in order to
+			# check if moving it will put our king in check. If not: OK
+			board[pos.x][pos.y] == 1 if white else -1
+			board[pawn.x][pawn.y] == 0
+			if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
 				_moves.append(pos)
+			# reverse
+			board[pos.x][pos.y] == 0
+			board[pawn.x][pawn.y] == 1 if white else -1
 	
 	# check diagonals
-	pos = pawn
-	for vec in [Vector2(0,-1), Vector2(0,1)]:
-		pos += direction + vec
-		if is_in_bounds(pos) and is_opponent(pos):
-			_moves.append(pos)
-		pos = pawn
+	for dir in [-1, 1]:
+		pos = pawn + Vector2(direction.x, dir)
+		if is_in_bounds(pos):
+			if is_opponent(pos):
+				# Make sure doesn't put our king in check
+				var temp = board[pos.x][pos.y]
+				board[pos.x][pos.y] == 1 if white else -1
+				board[pawn.x][pawn.y] == 0
+				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+					_moves.append(pos)
+				board[pos.x][pos.y] = temp
+				board[pawn.x][pawn.y] = 1 if white else -1
 	return _moves
 
 
@@ -518,8 +552,19 @@ func get_knight_moves(knight: Vector2) -> Array[Vector2]:
 	for dir in directions:
 		var pos : Vector2 = knight
 		pos += dir
-		if is_in_bounds(pos) and is_empty(pos):
-			_moves.append(pos)
+		if is_in_bounds(pos):
+			if is_empty(pos):
+				# We temporarily move the knight around the board in order to
+				# check if moving it will put our king in check. If not: OK
+				board[pos.x][pos.y] == 2 if white else -2
+				board[knight.x][knight.y] == 0
+				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] == 0
+				board[knight.x][knight.y] == 2 if white else -2
+			elif is_opponent(pos): 
+				_moves.append(pos)
 		pos = knight
 	return _moves
 
@@ -534,7 +579,15 @@ func get_bishop_moves(bishop: Vector2) -> Array[Vector2]:
 		pos += dir
 		while is_in_bounds(pos):
 			if is_empty(pos):
-				_moves.append(pos)
+				# We temporarily move the bishop around the board in order to
+				# check if moving it will put our king in check. If not: OK
+				board[pos.x][pos.y] == 3 if white else -3
+				board[bishop.x][bishop.y] == 0
+				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] == 0
+				board[bishop.x][bishop.y] == 3 if white else -3
 			elif is_opponent(pos):
 				_moves.append(pos)
 				break
@@ -556,7 +609,15 @@ func get_rook_moves(rook: Vector2) -> Array[Vector2]:
 		while is_in_bounds(pos):
 			# if empty or opponent, the move is valid: add pos to list
 			if is_empty(pos):
-				_moves.append(pos)
+				# We temporarily move the rook around the board in order to
+				# check if moving it will put our king in check. If not: OK
+				board[pos.x][pos.y] == 4 if white else -4
+				board[rook.x][rook.y] == 0
+				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] == 0
+				board[rook.x][rook.y] == 4 if white else -4
 			elif is_opponent(pos):
 				_moves.append(pos)
 				break
@@ -580,7 +641,15 @@ func get_queen_moves(queen: Vector2) -> Array[Vector2]:
 		pos += dir
 		while is_in_bounds(pos):
 			if is_empty(pos):
-				_moves.append(pos)
+				# We temporarily move the queen around the board in order to
+				# check if moving it will put our king in check. If not: OK
+				board[pos.x][pos.y] == 5 if white else -5
+				board[queen.x][queen.y] == 0
+				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] == 0
+				board[queen.x][queen.y] == 5 if white else -5
 			elif is_opponent(pos):
 				_moves.append(pos)
 				break
@@ -608,7 +677,6 @@ func get_king_moves(king: Vector2) -> Array[Vector2]:
 		var pos : Vector2 = king + dir
 		if is_in_bounds(pos):
 			if !is_in_check(pos):
-				if (pos.x == 2 and pos.x == 3): print("checked pos ok: %s" % [pos])
 				if is_empty(pos) || is_opponent(pos): 
 					_moves.append(pos)
 			
@@ -630,6 +698,7 @@ func get_king_moves(king: Vector2) -> Array[Vector2]:
 				is_empty(Vector2(7,1)) && !is_in_check(Vector2(7,1)):
 				_moves.append(Vector2(7,2))
 		if !rook_moved["black right"]:
+			print("7,5 empty: %s 7,5 clean: %s, 7,6 empty: %s, 7,6 clean: %s" % [is_empty(Vector2(7,5)), !is_in_check(Vector2(7,5)), is_empty(Vector2(7,6)), !is_in_check(Vector2(7,6))])
 			if is_empty(Vector2(7,5)) && !is_in_check(Vector2(7,5)) &&\
 				is_empty(Vector2(7,6)) && !is_in_check(Vector2(7,6)):
 				_moves.append(Vector2(7,6))
