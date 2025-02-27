@@ -70,13 +70,13 @@ var king_moved := {"white" : false, "black" : false}
 # Same for the castling rook
 var rook_moved := {"white left" : false, "black left" : false, "white right" : false, "black right" : false}
 # track data for long/short castling
-var castle_type = null
+var castle_type := ""
 # holds the position of a pawn eligible to be captured by en passant
-var en_passant = null
+var en_passant := Vector2()
 # for recording move history, want to know if we passant that turn
 var is_passant : bool = false
-# square getting promoted; dynamically cast so we can take advantage of null
-var promotion_square = null
+# square getting promoted; nonzero vector (move) triggers promotion buttons
+var promotion_square := Vector2()
 # 50 move rule - no captures within 50 moves = draw
 var fifty_moves : int = 0
 # threefold rule - 3 non-unique boards = can offer draw on or after 3rd unique
@@ -118,7 +118,7 @@ func _ready() -> void:
 
 func _input(event) -> void:
 	# (if there's a promotion we don't want to register the selection click here)
-	if event is InputEventMouseButton && event.pressed && promotion_square == null:
+	if event is InputEventMouseButton && event.pressed && promotion_square.length() != 0:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			# don't register interaction if mouse is outside area of the board
 			if is_mouse_out(): 
@@ -167,7 +167,7 @@ func _on_button_pressed(button: Node) -> void:
 	white_pieces.visible = false
 	black_pieces.visible = false
 	# reset the promotion square - this is how we hi-jacked LEFT_CLICK
-	promotion_square = null
+	promotion_square = Vector2()
 	display_board()
 
 
@@ -248,7 +248,7 @@ func set_move(row: int, col: int) -> void:
 						pawn_just_moved = true
 					# if we're a different pawn & one is eligible to capture by passant...
 					# let's see if we can capture it
-					elif en_passant != null:
+					elif en_passant.length() > 0:
 						# check if col of eligible pawn matches col of move +
 						# check that we're not moving vertically +
 						# check that row of eligible pawn == starting row of move
@@ -265,7 +265,7 @@ func set_move(row: int, col: int) -> void:
 					if move.x == 4 && selected_piece.x == 6:
 						en_passant = move
 						pawn_just_moved = true
-					elif en_passant != null:
+					elif en_passant.length() > 0:
 						if en_passant.y == move.y && selected_piece.y != move.y \
 							&& en_passant.x == selected_piece.x:
 							board[en_passant.x][en_passant.y] = 0
@@ -347,9 +347,9 @@ func set_move(row: int, col: int) -> void:
 			check_unique_board(board)
 				
 			# reset/update game variables
-			if !pawn_just_moved: en_passant = null
+			if !pawn_just_moved: en_passant = Vector2()
 			is_passant = false
-			castle_type = null
+			castle_type = ""
 			white = !white
 			# The piece sprites are instantiated children of TextureHolder so they 
 			# will persist unless killed - this is handled by display_board()
@@ -548,7 +548,7 @@ func get_pawn_moves(pawn: Vector2) -> Array[Vector2]:
 	# en passant
 	# if there are eligible captures and the pawn is on an eligible row
 	# and the opponent is exactly 1 col away, we can add the move
-	if en_passant != null && (white && pawn.x == 4 || !white && pawn.x == 3) && abs(en_passant.y - pawn.y) == 1:
+	if en_passant.length() > 0 && (white && pawn.x == 4 || !white && pawn.x == 3) && abs(en_passant.y - pawn.y) == 1:
 		var pos := pawn + direction
 		# # We temporarily move the pawns around the board in order to
 		# check if moving them will put our king in check. If not: OK
