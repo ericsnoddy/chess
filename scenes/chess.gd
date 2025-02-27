@@ -61,7 +61,6 @@ var selected_piece : Vector2
 var history : Array[Dictionary] = []
 # had to make this move history datum global because I'm not clever enough
 var captured_val : int = 0
-
 # SPECIAL HANDLING
 # kings' up-to-date position
 var white_king_pos := Vector2(0,4)
@@ -86,6 +85,7 @@ var fifty_moves : int = 0
 	#(1) the same player has the move,
 	#(2) pieces of the same kind and color occupy the same squares, and
 	#(3) the possible moves of all the pieces are the same.
+# I'm going the lazy route and just checking (2)
 var unique_board_moves: Array = []
 var num_unique_moves: Array = []
 
@@ -442,6 +442,7 @@ func is_dead_position() -> bool:
 
 func is_fifty_moves() -> bool:
 	return fifty_moves >= 50
+
 
 func is_empty(coords: Vector2) -> bool:
 	return board[coords.x][coords.y] == 0
