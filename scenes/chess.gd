@@ -1,5 +1,6 @@
 extends Sprite2D
 
+
 ## TODO
 # Stop the game when it's over
 # Stalemate: the player to move is not in check and has no legal move
@@ -37,19 +38,14 @@ const TURN_BLACK = preload("res://assets/turn-black.png")
 const TURN_WHITE = preload("res://assets/turn-white.png")
 const PIECE_MOVE = preload("res://assets/Piece_move.png")
 
-@onready var pieces := $Pieces
-@onready var dots := $Dots
-@onready var turn := $Turn
-@onready var white_pieces: Control = $"../CanvasLayer/white_pieces"
-@onready var black_pieces: Control = $"../CanvasLayer/black_pieces"
 
 # Positive numbers are white, negative numbers are black; values are:
 # 6 King 5 Queen 4 Rook 3 Bishop 2 Knight 1 Pawn 0 (empty square)
 # variables
 # hold the position of a piece: board[0][0] is index of piece at [0,0]
-var board : Array
+var board : Array[Array]
 # white's turn = true, black's turn = false
-var white : bool = true
+var white := true
 # Two states for the player: false == "selecting" and true == "confirming"
 var state : String = "selecting"
 # hold possible moves for currently selected piece
@@ -67,9 +63,9 @@ var captured_val : int = 0
 var white_king_pos := Vector2(0,4)
 var black_king_pos := Vector2(7,4)
 # once king moves it is ineligible for castling
-var king_moved := {"white" : false, "black" : false}
+var king_moved : Dictionary[String, bool] = { "white" : false, "black" : false }
 # Same for the castling rook
-var rook_moved := {"white left" : false, "black left" : false, "white right" : false, "black right" : false}
+var rook_moved : Dictionary[String, bool] = { "white left" : false, "black left" : false, "white right" : false, "black right" : false }
 # track data for long/short castling
 var castle_type := ""
 # holds the position of a pawn eligible to be captured by en passant
@@ -91,9 +87,15 @@ var unique_board_moves: Array = []
 var num_unique_moves: Array = []
 
 
+@onready var pieces := $Pieces
+@onready var dots := $Dots
+@onready var turn := $Turn
+@onready var white_pieces: Control = $"../CanvasLayer/white_pieces"
+@onready var black_pieces: Control = $"../CanvasLayer/black_pieces"
+
+
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
-	print("ready")
 	# bottom-left is [0,0]: see key above for piece values
 	board.append([4, 2, 3, 5, 6, 3, 2, 4])	# white pieces, [0,0] -> [0,7]
 	board.append([1, 1, 1, 1, 1, 1, 1, 1])	# [1,0] -> [1,7]
@@ -120,8 +122,7 @@ func _ready() -> void:
 
 func _input(event) -> void:
 	# (if there's a promotion we don't want to register the selection click here)
-	if event is InputEventMouseButton && event.pressed && promotion_square.length() == 0:
-		print("click")
+	if event is InputEventMouseButton and event.pressed and promotion_square == Vector2.ZERO:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			# don't register interaction if mouse is outside area of the board
 			if is_mouse_out(): 
@@ -135,7 +136,7 @@ func _input(event) -> void:
 			
 			# Route the click depending on the state
 			# make sure the selected position is eligible before showing options
-			if state == "selecting" && (white && board[row][col] > 0 || !white && board[row][col] < 0):
+			if state == "selecting" and (white and board[row][col] > 0 or not white and board[row][col] < 0):
 				selected_piece = Vector2(row, col)
 				show_options()
 				state = "confirming"
@@ -147,19 +148,21 @@ func _input(event) -> void:
 
 
 func _on_button_pressed(button: Node) -> void:
-	print("on button pressed")
 	# get the piece value from the name and ensure it's 1 char
 	var val : int = int(button.name.substr(0,1))
 	
 	# record history before updating board
-	record_history( selected_piece, 
-					promotion_square, 
-					board[promotion_square.x][promotion_square.y], 
-					captured_val, 
-					false, 
-					val,
+	record_history( 
+			selected_piece, 
+			promotion_square, 
+			board[promotion_square.x][promotion_square.y], 
+			captured_val, 
+			false, 
+			val,
 	)
+	
 	print(history.back())
+	
 	# incrememnt the fifty moves counter if appropriate
 	incr_fifty_moves()
 	check_unique_board(board)
@@ -171,7 +174,7 @@ func _on_button_pressed(button: Node) -> void:
 	white_pieces.visible = false
 	black_pieces.visible = false
 	# reset the promotion square - this is how we hi-jacked LEFT_CLICK
-	promotion_square = Vector2()
+	promotion_square = Vector2.ZERO
 	display_board()
 
 
@@ -211,8 +214,10 @@ func display_board() -> void:
 				1: holder.texture = WHITE_PAWN
 	
 	# display turn marker
-	if white: turn.texture = TURN_WHITE
-	else: turn.texture = TURN_BLACK
+	if white: 
+		turn.texture = TURN_WHITE
+	else: 
+		turn.texture = TURN_BLACK
 
 
 func get_moves(selected: Vector2) -> Array:
@@ -235,7 +240,7 @@ func set_move(row: int, col: int) -> void:
 	
 	# if input coords == a legal move: update board, record history, reset
 	for move in moves:
-		if move.x == row && move.y == col:
+		if move.x == row and move.y == col:
 			# val of ending square before move (captured = 0 if empty)
 			captured_val = board[move.x][move.y]
 			# OK FUCK let's try a match statement and just handle individual pieces
@@ -247,7 +252,7 @@ func set_move(row: int, col: int) -> void:
 						promote(move)
 					# en passant
 					# mark our pawn as eligible to be captured by en passant
-					if move.x == 3 && selected_piece.x == 1:
+					if move.x == 3 and selected_piece.x == 1:
 						en_passant = move
 						pawn_just_moved = true
 					# if we're a different pawn & one is eligible to capture by passant...
@@ -257,8 +262,10 @@ func set_move(row: int, col: int) -> void:
 						# check that we're not moving vertically +
 						# check that row of eligible pawn == starting row of move
 						# There, did I catch all the damn edge cases???
-						if en_passant.y == move.y && selected_piece.y != move.y \
-							&& en_passant.x == selected_piece.x:
+						if (
+								en_passant.y == move.y and selected_piece.y != move.y
+								and en_passant.x == selected_piece.x
+						):
 							board[en_passant.x][en_passant.y] = 0
 							# data for move history
 							is_passant = true
@@ -266,28 +273,28 @@ func set_move(row: int, col: int) -> void:
 				-1:
 					if move.x == 0:
 						promote(move)
-					if move.x == 4 && selected_piece.x == 6:
+					if move.x == 4 and selected_piece.x == 6:
 						en_passant = move
 						pawn_just_moved = true
 					elif en_passant.length() > 0:
-						if en_passant.y == move.y && selected_piece.y != move.y \
-							&& en_passant.x == selected_piece.x:
+						if en_passant.y == move.y and selected_piece.y != move.y \
+							and en_passant.x == selected_piece.x:
 							board[en_passant.x][en_passant.y] = 0
 							is_passant = true
 							captured_val = 1
 				4:  # we need to know if rooks moved for castling eligibility
-					if selected_piece.x == 0 && selected_piece.y == 0:
+					if selected_piece.x == 0 and selected_piece.y == 0:
 						rook_moved["white left"] = true
-					elif selected_piece.x == 0 && selected_piece.y == 7:
+					elif selected_piece.x == 0 and selected_piece.y == 7:
 						rook_moved["white right"] = true
 				-4: 
-					if selected_piece.x == 7 && selected_piece.y == 0:
+					if selected_piece.x == 7 and selected_piece.y == 0:
 						rook_moved["black left"] = true
-					elif selected_piece.x == 7 && selected_piece.y == 7:
+					elif selected_piece.x == 7 and selected_piece.y == 7:
 						rook_moved["black right"] = true
 				6:
 					# castling
-					if selected_piece.x == 0 && selected_piece.y == 4:
+					if selected_piece.x == 0 and selected_piece.y == 4:
 						king_moved["white"] = true						
 						# if the king moved 2 units he must have castled
 						if move.y == selected_piece.y - 2:
@@ -307,7 +314,7 @@ func set_move(row: int, col: int) -> void:
 					# track the white king
 					white_king_pos = Vector2(move.x, move.y)
 				-6:
-					if selected_piece.x == 7 && selected_piece.y == 4:
+					if selected_piece.x == 7 and selected_piece.y == 4:
 						king_moved["black"] = true
 						if move.y == selected_piece.y - 2:
 							castle_type = "long"
@@ -333,7 +340,7 @@ func set_move(row: int, col: int) -> void:
 			
 			# add a dictionary of data to history array
 			# but not if promoting -- record is called in that loop
-			if (white && move.x == 7) or (!white && move.x == 0):
+			if (white and move.x == 7) or (!white and move.x == 0):
 				pass
 			else:
 				record_history(
@@ -363,7 +370,7 @@ func set_move(row: int, col: int) -> void:
 	state = "selecting"
 	
 	# one-click reselect functionality
-	if (selected_piece.x != row || selected_piece.y != col) && (white && board[row][col] > 0 || !white && board[row][col] < 0):
+	if (selected_piece.x != row || selected_piece.y != col) and (white and board[row][col] > 0 || !white and board[row][col] < 0):
 		selected_piece = Vector2(row, col)
 		show_options()
 		state = "confirming"
@@ -474,14 +481,14 @@ func is_in_check(check_pos: Vector2) -> bool:
 	# simple diagonal
 	for p in pawn_attacks:
 		if is_in_bounds(p):
-			if (white && board[p.x][p.y] == -1) or (!white && board[p.x][p.y] == 1):
+			if (white and board[p.x][p.y] == -1) or (!white and board[p.x][p.y] == 1):
 				return true
 				
 	# simple king check
 	for dir in directions:
 		var pos = check_pos + dir
 		if is_in_bounds(pos):
-			if white && board[pos.x][pos.y] == -6 || !white && board[pos.x][pos.y] == 6: return true
+			if white and board[pos.x][pos.y] == -6 || !white and board[pos.x][pos.y] == 6: return true
 			
 	# checking long range opponents in all directions
 	for dir in directions:
@@ -491,11 +498,11 @@ func is_in_check(check_pos: Vector2) -> bool:
 				var piece = board[pos.x][pos.y]
 				# vertical/horizontal - if we encounter a rook or queen it's a check
 				if (dir.x == 0 || dir.y == 0):
-					if (white && piece in [-4, -5] || !white && piece in [4, 5]):
+					if (white and piece in [-4, -5] || !white and piece in [4, 5]):
 						return true
 				# diagonal - if we encounter a bishop or queen
-				elif (dir.x != 0 && dir.y != 0):
-					if (white && piece in [-3, -5] || !white && piece in [3, 5]):
+				elif (dir.x != 0 and dir.y != 0):
+					if (white and piece in [-3, -5] || !white and piece in [3, 5]):
 						return true
 				break
 			pos += dir
@@ -507,7 +514,7 @@ func is_in_check(check_pos: Vector2) -> bool:
 	for dir in directions:
 		var pos = check_pos + dir
 		if is_in_bounds(pos):
-			if (white && board[pos.x][pos.y] == -2) or (!white && board[pos.x][pos.y] == 2):
+			if (white and board[pos.x][pos.y] == -2) or (!white and board[pos.x][pos.y] == 2):
 				return true
 	
 	# Not in check - return false
@@ -546,20 +553,20 @@ func get_pawn_moves(pawn: Vector2) -> Array[Vector2]:
 	else: direction = Vector2(-1,0)
 	
 	# if pawn hasn't moved, can move 1 or 2 spaces
-	if (white && pawn.x == 1) or (!white && pawn.x == 6):
+	if (white and pawn.x == 1) or (!white and pawn.x == 6):
 		is_first_move = true
 		
 	# en passant
 	# if there are eligible captures and the pawn is on an eligible row
 	# and the opponent is exactly 1 col away, we can add the move
-	if en_passant.length() > 0 && (white && pawn.x == 4 || !white && pawn.x == 3) && abs(en_passant.y - pawn.y) == 1:
+	if en_passant.length() > 0 and (white and pawn.x == 4 || !white and pawn.x == 3) and abs(en_passant.y - pawn.y) == 1:
 		var passant_pos : Vector2 = pawn + direction
 		# # We temporarily move the pawns around the board in order to
 		# check if moving them will put our king in check. If not: OK
 		board[passant_pos.x][passant_pos.y] = 1 if white else -1
 		board[pawn.x][pawn.y] = 0
 		board[en_passant.x][en_passant.y] = 0
-		if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+		if (white and !is_in_check(white_king_pos)) or (!white and !is_in_check(black_king_pos)):
 			_moves.append(passant_pos)
 		# reverse
 		board[passant_pos.x][passant_pos.y] = 0
@@ -575,7 +582,7 @@ func get_pawn_moves(pawn: Vector2) -> Array[Vector2]:
 		# check if moving it will put our king in check. If not: OK
 		board[pos.x][pos.y] = 1 if white else -1
 		board[pawn.x][pawn.y] = 0
-		if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+		if (white and !is_in_check(white_king_pos)) or (!white and !is_in_check(black_king_pos)):
 			_moves.append(pos)
 		# reverse
 		board[pos.x][pos.y] = 0
@@ -583,12 +590,12 @@ func get_pawn_moves(pawn: Vector2) -> Array[Vector2]:
 	
 	if is_first_move:
 		pos = pawn + direction * 2
-		if is_empty(pawn + direction) && is_empty(pos):
+		if is_empty(pawn + direction) and is_empty(pos):
 			# We temporarily move the pawn around the board in order to
 			# check if moving it will put our king in check. If not: OK
 			board[pos.x][pos.y] = 1 if white else -1
 			board[pawn.x][pawn.y] = 0
-			if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+			if (white and !is_in_check(white_king_pos)) or (!white and !is_in_check(black_king_pos)):
 				_moves.append(pos)
 			# reverse
 			board[pos.x][pos.y] = 0
@@ -603,7 +610,7 @@ func get_pawn_moves(pawn: Vector2) -> Array[Vector2]:
 				var temp = board[pos.x][pos.y]
 				board[pos.x][pos.y] = 1 if white else -1
 				board[pawn.x][pawn.y] = 0
-				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+				if (white and !is_in_check(white_king_pos)) or (!white and !is_in_check(black_king_pos)):
 					_moves.append(pos)
 				board[pos.x][pos.y] = temp
 				board[pawn.x][pawn.y] = 1 if white else -1
@@ -627,7 +634,7 @@ func get_knight_moves(knight: Vector2) -> Array[Vector2]:
 				# check if moving it will put our king in check. If not: OK
 				board[pos.x][pos.y] = 2 if white else -2
 				board[knight.x][knight.y] = 0
-				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+				if (white and !is_in_check(white_king_pos)) or (!white and !is_in_check(black_king_pos)):
 					_moves.append(pos)
 				# reverse
 				board[pos.x][pos.y] = 0
@@ -636,7 +643,7 @@ func get_knight_moves(knight: Vector2) -> Array[Vector2]:
 				var temp = board[pos.x][pos.y]
 				board[pos.x][pos.y] = 2 if white else -2
 				board[knight.x][knight.y] = 0
-				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+				if (white and !is_in_check(white_king_pos)) or (!white and !is_in_check(black_king_pos)):
 					_moves.append(pos)
 				# reverse
 				board[pos.x][pos.y] = temp
@@ -659,7 +666,7 @@ func get_bishop_moves(bishop: Vector2) -> Array[Vector2]:
 				# check if moving it will put our king in check. If not: OK
 				board[pos.x][pos.y] = 3 if white else -3
 				board[bishop.x][bishop.y] = 0
-				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+				if (white and !is_in_check(white_king_pos)) or (!white and !is_in_check(black_king_pos)):
 					_moves.append(pos)
 				# reverse
 				board[pos.x][pos.y] = 0
@@ -668,7 +675,7 @@ func get_bishop_moves(bishop: Vector2) -> Array[Vector2]:
 				var temp = board[pos.x][pos.y]
 				board[pos.x][pos.y] = 3 if white else -3
 				board[bishop.x][bishop.y] = 0
-				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+				if (white and !is_in_check(white_king_pos)) or (!white and !is_in_check(black_king_pos)):
 					_moves.append(pos)
 				# reverse
 				board[pos.x][pos.y] = temp
@@ -696,7 +703,7 @@ func get_rook_moves(rook: Vector2) -> Array[Vector2]:
 				# check if moving it will put our king in check. If not: OK
 				board[pos.x][pos.y] = 4 if white else -4
 				board[rook.x][rook.y] = 0
-				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+				if (white and !is_in_check(white_king_pos)) or (!white and !is_in_check(black_king_pos)):
 					_moves.append(pos)
 				# reverse
 				board[pos.x][pos.y] = 0
@@ -705,7 +712,7 @@ func get_rook_moves(rook: Vector2) -> Array[Vector2]:
 				var temp = board[pos.x][pos.y]
 				board[pos.x][pos.y] = 4 if white else -4
 				board[rook.x][rook.y] = 0
-				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+				if (white and !is_in_check(white_king_pos)) or (!white and !is_in_check(black_king_pos)):
 					_moves.append(pos)
 				# reverse
 				board[pos.x][pos.y] = temp
@@ -735,7 +742,7 @@ func get_queen_moves(queen: Vector2) -> Array[Vector2]:
 				# check if moving it will put our king in check. If not: OK
 				board[pos.x][pos.y] = 5 if white else -5
 				board[queen.x][queen.y] = 0
-				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+				if (white and !is_in_check(white_king_pos)) or (!white and !is_in_check(black_king_pos)):
 					_moves.append(pos)
 				# reverse
 				board[pos.x][pos.y] = 0
@@ -744,7 +751,7 @@ func get_queen_moves(queen: Vector2) -> Array[Vector2]:
 				var temp = board[pos.x][pos.y]
 				board[pos.x][pos.y] = 5 if white else -5
 				board[queen.x][queen.y] = 0
-				if (white && !is_in_check(white_king_pos)) or (!white && !is_in_check(black_king_pos)):
+				if (white and !is_in_check(white_king_pos)) or (!white and !is_in_check(black_king_pos)):
 					_moves.append(pos)
 				# reverse
 				board[pos.x][pos.y] = temp
@@ -778,26 +785,25 @@ func get_king_moves(king: Vector2) -> Array[Vector2]:
 					_moves.append(pos)
 			
 	# check castle eligibility and return moves
-	if white && !king_moved["white"]:
+	if white and !king_moved["white"]:
 		if !rook_moved["white left"]:
-			if is_empty(Vector2(0,3)) && !is_in_check(Vector2(0,3)) &&\
-				is_empty(Vector2(0,2)) && !is_in_check(Vector2(0,2)) &&\
-				is_empty(Vector2(0,1)) && !is_in_check(Vector2(0,1)):
+			if is_empty(Vector2(0,3)) and !is_in_check(Vector2(0,3)) and\
+				is_empty(Vector2(0,2)) and !is_in_check(Vector2(0,2)) and\
+				is_empty(Vector2(0,1)) and !is_in_check(Vector2(0,1)):
 				_moves.append(Vector2(0,2))
 		if !rook_moved["white right"]:
-			if is_empty(Vector2(0,5)) && !is_in_check(Vector2(0,5)) &&\
-				is_empty(Vector2(0,6)) && !is_in_check(Vector2(0,6)):
+			if is_empty(Vector2(0,5)) and !is_in_check(Vector2(0,5)) and\
+				is_empty(Vector2(0,6)) and !is_in_check(Vector2(0,6)):
 				_moves.append(Vector2(0,6))
-	elif !white && !king_moved["black"]:
+	elif !white and !king_moved["black"]:
 		if !rook_moved["black left"]:
-			if is_empty(Vector2(7,3)) && !is_in_check(Vector2(7,3)) &&\
-				is_empty(Vector2(7,2)) && !is_in_check(Vector2(7,2)) &&\
-				is_empty(Vector2(7,1)) && !is_in_check(Vector2(7,1)):
+			if is_empty(Vector2(7,3)) and !is_in_check(Vector2(7,3)) and\
+				is_empty(Vector2(7,2)) and !is_in_check(Vector2(7,2)) and\
+				is_empty(Vector2(7,1)) and !is_in_check(Vector2(7,1)):
 				_moves.append(Vector2(7,2))
 		if !rook_moved["black right"]:
-			print("7,5 empty: %s 7,5 clean: %s, 7,6 empty: %s, 7,6 clean: %s" % [is_empty(Vector2(7,5)), !is_in_check(Vector2(7,5)), is_empty(Vector2(7,6)), !is_in_check(Vector2(7,6))])
-			if is_empty(Vector2(7,5)) && !is_in_check(Vector2(7,5)) &&\
-				is_empty(Vector2(7,6)) && !is_in_check(Vector2(7,6)):
+			if is_empty(Vector2(7,5)) and !is_in_check(Vector2(7,5)) and\
+				is_empty(Vector2(7,6)) and !is_in_check(Vector2(7,6)):
 				_moves.append(Vector2(7,6))
 				
 	# Unhide the king
