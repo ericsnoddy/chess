@@ -1,14 +1,14 @@
 [gd_scene load_steps=36 format=3 uid="uid://bds2hr704t4tj"]
 
-[ext_resource type="Texture2D" uid="uid://ctsgdmugmedg5" path="res://assets/white_knight.png" id="1_rf6ae"]
+[ext_resource type="Texture2D" uid="uid://dr1joj5cx53ki" path="res://assets/white_knight.png" id="1_rf6ae"]
 [ext_resource type="PackedScene" uid="uid://bkg3clffne21g" path="res://scenes/board.tscn" id="1_y8b70"]
-[ext_resource type="Texture2D" uid="uid://dn55e0qqy2f8g" path="res://assets/white_bishop.png" id="2_evkj7"]
-[ext_resource type="Texture2D" uid="uid://ctq0j6xxcqikw" path="res://assets/white_rook.png" id="3_a1yri"]
-[ext_resource type="Texture2D" uid="uid://oqqp46qtmwfu" path="res://assets/white_queen.png" id="4_127ft"]
-[ext_resource type="Texture2D" uid="uid://bftid8e6hwnna" path="res://assets/black_knight.png" id="5_bltry"]
-[ext_resource type="Texture2D" uid="uid://bmmt31nb526bf" path="res://assets/black_bishop.png" id="6_4mely"]
-[ext_resource type="Texture2D" uid="uid://bhr8c2pb02smt" path="res://assets/black_rook.png" id="7_ppnhm"]
-[ext_resource type="Texture2D" uid="uid://bs6nmydq4udho" path="res://assets/black_queen.png" id="8_p2igy"]
+[ext_resource type="Texture2D" uid="uid://dm5ceup0mm0y3" path="res://assets/white_bishop.png" id="2_evkj7"]
+[ext_resource type="Texture2D" uid="uid://yha6fa30bq81" path="res://assets/white_rook.png" id="3_a1yri"]
+[ext_resource type="Texture2D" uid="uid://dahkxppyqyao7" path="res://assets/white_queen.png" id="4_127ft"]
+[ext_resource type="Texture2D" uid="uid://b4ja57p3tgq54" path="res://assets/black_knight.png" id="5_bltry"]
+[ext_resource type="Texture2D" uid="uid://bskss11qmdkjs" path="res://assets/black_bishop.png" id="6_4mely"]
+[ext_resource type="Texture2D" uid="uid://bthsebulbsc7m" path="res://assets/black_rook.png" id="7_ppnhm"]
+[ext_resource type="Texture2D" uid="uid://dwlm7fy3a28lc" path="res://assets/black_queen.png" id="8_p2igy"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_wyqly"]
 
@@ -87,6 +87,9 @@ texture = ExtResource("8_p2igy")
 texture = ExtResource("8_p2igy")
 
 [node name="Main" type="Node2D"]
+
+[node name="Board" parent="." instance=ExtResource("1_y8b70")]
+position = Vector2(72, -72)
 
 [node name="Camera2D" type="Camera2D" parent="."]
 position = Vector2(72, -72)
@@ -218,6 +221,3 @@ offset_right = 256.0
 offset_bottom = 64.0
 theme_override_font_sizes/font_size = 39
 text = "Accept Draw?"
-
-[node name="Board" parent="." instance=ExtResource("1_y8b70")]
-position = Vector2(72, -72)
