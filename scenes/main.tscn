@@ -1,14 +1,14 @@
 [gd_scene load_steps=36 format=3 uid="uid://bds2hr704t4tj"]
 
-[ext_resource type="Texture2D" uid="uid://dr1joj5cx53ki" path="res://assets/white_knight.png" id="1_rf6ae"]
+[ext_resource type="Texture2D" uid="uid://dr1joj5cx53ki" path="res://assets_old/white_knight.png" id="1_rf6ae"]
 [ext_resource type="PackedScene" uid="uid://bkg3clffne21g" path="res://scenes/board.tscn" id="1_y8b70"]
-[ext_resource type="Texture2D" uid="uid://dm5ceup0mm0y3" path="res://assets/white_bishop.png" id="2_evkj7"]
-[ext_resource type="Texture2D" uid="uid://yha6fa30bq81" path="res://assets/white_rook.png" id="3_a1yri"]
-[ext_resource type="Texture2D" uid="uid://dahkxppyqyao7" path="res://assets/white_queen.png" id="4_127ft"]
-[ext_resource type="Texture2D" uid="uid://b4ja57p3tgq54" path="res://assets/black_knight.png" id="5_bltry"]
-[ext_resource type="Texture2D" uid="uid://bskss11qmdkjs" path="res://assets/black_bishop.png" id="6_4mely"]
-[ext_resource type="Texture2D" uid="uid://bthsebulbsc7m" path="res://assets/black_rook.png" id="7_ppnhm"]
-[ext_resource type="Texture2D" uid="uid://dwlm7fy3a28lc" path="res://assets/black_queen.png" id="8_p2igy"]
+[ext_resource type="Texture2D" uid="uid://dm5ceup0mm0y3" path="res://assets_old/white_bishop.png" id="2_evkj7"]
+[ext_resource type="Texture2D" uid="uid://yha6fa30bq81" path="res://assets_old/white_rook.png" id="3_a1yri"]
+[ext_resource type="Texture2D" uid="uid://dahkxppyqyao7" path="res://assets_old/white_queen.png" id="4_127ft"]
+[ext_resource type="Texture2D" uid="uid://b4ja57p3tgq54" path="res://assets_old/black_knight.png" id="5_bltry"]
+[ext_resource type="Texture2D" uid="uid://bskss11qmdkjs" path="res://assets_old/black_bishop.png" id="6_4mely"]
+[ext_resource type="Texture2D" uid="uid://bthsebulbsc7m" path="res://assets_old/black_rook.png" id="7_ppnhm"]
+[ext_resource type="Texture2D" uid="uid://dwlm7fy3a28lc" path="res://assets_old/black_queen.png" id="8_p2igy"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_wyqly"]
 
