@@ -97,14 +97,15 @@ var num_unique_moves: Array = []
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	# bottom-left is [0,0]: see key above for piece values
-	board.append([4, 2, 3, 5, 6, 3, 2, 4])	# white pieces, [0,0] -> [0,7]
-	board.append([1, 1, 1, 1, 1, 1, 1, 1])	# [1,0] -> [1,7]
+	board.append([4, 2, 3, 5, 6, 3, 2, 4]) # white pieces, [0,0] -> [0,7]
+	board.append([1, 1, 1, 1, 1, 1, 1, 1]) # [1,0] -> [1,7]
 	board.append([0, 0, 0, 0, 0, 0, 0, 0])
 	board.append([0, 0, 0, 0, 0, 0, 0, 0])
 	board.append([0, 0, 0, 0, 0, 0, 0, 0])
 	board.append([0, 0, 0, 0, 0, 0, 0, 0])
 	board.append([-1, -1, -1, -1, -1, -1, -1, -1])
-	board.append([-4, -2, -3, -5, -6, -3, -2, -4])	# [7,0] -> [7,7]
+	board.append([-4, -2, -3, -5, -6, -3, -2, -4]) # [7,0] -> [7,7]
+	
 	
 	# only calls display_board() once on _ready - make sure to call it below in the game loop
 	display_board()
@@ -270,6 +271,7 @@ func set_move(row: int, col: int) -> void:
 							# data for move history
 							is_passant = true
 							captured_val = -1
+					
 				-1:
 					if move.x == 0:
 						promote(move)
@@ -277,25 +279,30 @@ func set_move(row: int, col: int) -> void:
 						en_passant = move
 						pawn_just_moved = true
 					elif en_passant.length() > 0:
-						if en_passant.y == move.y and selected_piece.y != move.y \
-							and en_passant.x == selected_piece.x:
+						if (
+								en_passant.y == move.y and selected_piece.y != move.y
+								and en_passant.x == selected_piece.x
+						):
 							board[en_passant.x][en_passant.y] = 0
 							is_passant = true
 							captured_val = 1
+					
 				4:  # we need to know if rooks moved for castling eligibility
 					if selected_piece.x == 0 and selected_piece.y == 0:
 						rook_moved["white left"] = true
 					elif selected_piece.x == 0 and selected_piece.y == 7:
 						rook_moved["white right"] = true
+					
 				-4: 
 					if selected_piece.x == 7 and selected_piece.y == 0:
 						rook_moved["black left"] = true
 					elif selected_piece.x == 7 and selected_piece.y == 7:
 						rook_moved["black right"] = true
+						
 				6:
 					# castling
 					if selected_piece.x == 0 and selected_piece.y == 4:
-						king_moved["white"] = true						
+						king_moved["white"] = true
 						# if the king moved 2 units he must have castled
 						if move.y == selected_piece.y - 2:
 							castle_type = "long"
@@ -313,6 +320,7 @@ func set_move(row: int, col: int) -> void:
 							board[0][5] = 4
 					# track the white king
 					white_king_pos = Vector2(move.x, move.y)
+					
 				-6:
 					if selected_piece.x == 7 and selected_piece.y == 4:
 						king_moved["black"] = true
@@ -340,7 +348,7 @@ func set_move(row: int, col: int) -> void:
 			
 			# add a dictionary of data to history array
 			# but not if promoting -- record is called in that loop
-			if (white and move.x == 7) or (!white and move.x == 0):
+			if white and move.x == 7 or not white and move.x == 0:
 				pass
 			else:
 				record_history(
@@ -351,6 +359,7 @@ func set_move(row: int, col: int) -> void:
 					is_passant,
 					null,
 				)
+				# DEBUG PRINT
 				print(history.back())
 			# increment 50 moves counter if appropriate
 			incr_fifty_moves()
@@ -358,25 +367,35 @@ func set_move(row: int, col: int) -> void:
 			check_unique_board(board)
 				
 			# reset/update game variables
-			if !pawn_just_moved: en_passant = Vector2()
+			if not pawn_just_moved: 
+				en_passant = Vector2.ZERO
 			is_passant = false
 			castle_type = ""
-			white = !white
+			white = not white
 			# The piece sprites are instantiated children of TextureHolder so they 
 			# will persist unless killed - this is handled by display_board()
 			display_board()
 			break
+		
 	show_dots(false)
 	state = "selecting"
 	
 	# one-click reselect functionality
-	if (selected_piece.x != row || selected_piece.y != col) and (white and board[row][col] > 0 || !white and board[row][col] < 0):
+	if (
+			# if another piece is selected and it is the player's turn...
+			(selected_piece.x != row or selected_piece.y != col) 
+			and (white and board[row][col] > 0 or not white and board[row][col] < 0)
+	):
 		selected_piece = Vector2(row, col)
 		show_options()
 		state = "confirming"
 	
-	if is_fifty_moves(): print("DRAW: 50 moves rule")
-	elif is_dead_position(): print("DRAW: Insufficient material")
+	if is_fifty_moves(): 
+		# TODO
+		print("DRAW: 50 moves rule")
+	elif is_dead_position(): 
+		# TODO
+		print("DRAW: Insufficient material")
 
 
 func record_history(start_pos: Vector2, end_pos: Vector2, piece_val: int, capture_val: int, passant: bool, promo) -> void:
@@ -413,7 +432,7 @@ func show_dots(to_show: bool = true) -> void:
 			dots.add_child(holder)
 			holder.texture = PIECE_MOVE
 			holder.global_position = Vector2(move.y * CELL_WIDTH + HALF_CELL, -move.x * CELL_WIDTH - HALF_CELL)
-	# delete the dots
+	# else delete the dots
 	else:
 		for child in dots.get_children():
 			child.queue_free()
@@ -424,8 +443,10 @@ func check_unique_board(board_to_check: Array) -> void:
 		if board_to_check == unique_board_moves[b]:
 			num_unique_moves[b] += 1
 			if num_unique_moves[b] == 5:
+				# TODO
 				print("DRAW: Fivefold repetition rule")
 			elif num_unique_moves[b] >= 3:
+				# TODO
 				print("DRAW? Threefold repetition rule")
 			return
 	unique_board_moves.append(board_to_check.duplicate(true))
@@ -433,22 +454,57 @@ func check_unique_board(board_to_check: Array) -> void:
 
 
 func is_dead_position() -> bool:
-	# we know there's a dead position when insufficent material
-	var white_piece = 0
-	var black_piece = 0
+	# If both sides have 1) A lone king, 2) King and Knight only 3) King and bishop only
+	# OR 4) one side has a lone King and the other side has a King and two Knights
+	# King vs. King
+	# King and Bishop vs. King
+	# King and Knight vs. King
+	# King and two knights vs. King (Per USCF not FIDE)
+	var white_knights = 0
+	var black_knights = 0
+	var white_bishops = 0
+	var black_bishops = 0
 	
 	for i in BOARD_SIZE:
 		for j in BOARD_SIZE:
 			match board[i][j]:
-				2, 3:
-					if white_piece == 0: white_piece += 1
-					else: return false
-				-2, -3:
-					if black_piece == 0: black_piece += 1
-					else: return false
-				6, -6, 0: pass
-				_: return false
-	return true
+				2:
+					# count knights
+					white_knights += 1					
+				-2:
+					black_knights += 1
+				3:
+					if white_bishops == 0: 
+						white_bishops += 1
+					else:
+						# if bishop count > 1, not insufficient
+						return false
+				-3:
+					if black_bishops == 0: 
+						black_bishops += 1
+					else:
+						# if knight and/or bishop count > 1, not insufficient
+						return false
+				6, -6, 0: 
+					pass
+				_: # Any num pawns, rooks or queens are sufficient
+					return false
+	if (
+			# At this point we know there are no pawns, rooks, queens, or bishops > 1
+			# (Probably a more elegant way of doing this)
+			# King + Bishops <= 1 (also captures King vs King)
+			white_knights == 0 and white_bishops == 0 and black_knights == 0 and black_bishops <= 1
+			# King + Knights <= 2
+			or white_knights == 0 and white_bishops == 0 and black_knights <= 2 and black_bishops == 0
+			# King + Bishops < 2 (also captures King vs King)
+			or black_knights == 0 and black_bishops == 0 and white_knights == 0 and white_bishops < 2
+			# King + Knights <= 2
+			or black_knights == 0 and black_bishops == 0 and white_knights <= 2 and white_bishops == 0
+	):
+		# insufficient material confirmed
+		return true
+	else:
+		return false
 
 
 func is_fifty_moves() -> bool:
@@ -481,35 +537,50 @@ func is_in_check(check_pos: Vector2) -> bool:
 	# simple diagonal
 	for p in pawn_attacks:
 		if is_in_bounds(p):
-			if (white and board[p.x][p.y] == -1) or (!white and board[p.x][p.y] == 1):
+			if (
+					white and board[p.x][p.y] == -1
+					or !white and board[p.x][p.y] == 1
+			):
 				return true
 				
 	# simple king check
 	for dir in directions:
 		var pos = check_pos + dir
 		if is_in_bounds(pos):
-			if white and board[pos.x][pos.y] == -6 || !white and board[pos.x][pos.y] == 6: return true
+			if (
+					white and board[pos.x][pos.y] == -6
+					or !white and board[pos.x][pos.y] == 6
+			): 
+				return true
 			
 	# checking long range opponents in all directions
 	for dir in directions:
 		var pos = check_pos + dir
 		while is_in_bounds(pos):
-			if !is_empty(pos):
+			if not is_empty(pos):
 				var piece = board[pos.x][pos.y]
 				# vertical/horizontal - if we encounter a rook or queen it's a check
-				if (dir.x == 0 || dir.y == 0):
-					if (white and piece in [-4, -5] || !white and piece in [4, 5]):
+				if dir.x == 0 or dir.y == 0:
+					if (
+							white and piece in [-4, -5]
+							or !white and piece in [4, 5]
+					):
 						return true
-				# diagonal - if we encounter a bishop or queen
-				elif (dir.x != 0 and dir.y != 0):
-					if (white and piece in [-3, -5] || !white and piece in [3, 5]):
+				# diagonal - if we encounter a bishop or queen it's a check
+				elif dir.x != 0 and dir.y != 0:
+					if (
+							white and piece in [-3, -5]
+							or !white and piece in [3, 5]
+					):
 						return true
 				break
 			pos += dir
 	
 	# KNIGHT
-	directions = [Vector2(2, 1), Vector2(2, -1), Vector2(1, 2), Vector2(1, -2),
-	Vector2(-2, 1), Vector2(-2, -1), Vector2(-1, 2), Vector2(-1, -2)]
+	directions = [
+		Vector2(2, 1), Vector2(2, -1), Vector2(1, 2), Vector2(1, -2),
+		Vector2(-2, 1), Vector2(-2, -1), Vector2(-1, 2), Vector2(-1, -2)
+	]
 	
 	for dir in directions:
 		var pos = check_pos + dir
@@ -559,7 +630,7 @@ func get_pawn_moves(pawn: Vector2) -> Array[Vector2]:
 	# en passant
 	# if there are eligible captures and the pawn is on an eligible row
 	# and the opponent is exactly 1 col away, we can add the move
-	if en_passant.length() > 0 and (white and pawn.x == 4 || !white and pawn.x == 3) and abs(en_passant.y - pawn.y) == 1:
+	if en_passant.length() > 0 and (white and pawn.x == 4 or !white and pawn.x == 3) and abs(en_passant.y - pawn.y) == 1:
 		var passant_pos : Vector2 = pawn + direction
 		# # We temporarily move the pawns around the board in order to
 		# check if moving them will put our king in check. If not: OK
@@ -781,7 +852,7 @@ func get_king_moves(king: Vector2) -> Array[Vector2]:
 		var pos : Vector2 = king + dir
 		if is_in_bounds(pos):
 			if !is_in_check(pos):
-				if is_empty(pos) || is_opponent(pos): 
+				if is_empty(pos) or is_opponent(pos): 
 					_moves.append(pos)
 			
 	# check castle eligibility and return moves
