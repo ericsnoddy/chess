@@ -438,7 +438,7 @@ func show_dots(to_show: bool = true) -> void:
 	if to_show:
 		for move in moves:
 			# we just change the image of a single sprite to draw all the dots
-			var holder := TEXTURE_HOLDER.instantiate()
+			var holder : Node = TEXTURE_HOLDER.instantiate()
 			dots.add_child(holder)
 			holder.texture = PIECE_MOVE
 			holder.global_position = Vector2(move.y * CELL_WIDTH + HALF_CELL, -move.x * CELL_WIDTH - HALF_CELL)
