@@ -37,7 +37,7 @@ const WHITE_ROOK = preload("res://assets/white_rook.png")
 
 const TURN_BLACK = preload("res://assets/turn-black.png")
 const TURN_WHITE = preload("res://assets/turn-white.png")
-const PIECE_MOVE = preload("res://assets/Piece_move.png")
+const PIECE_MOVE = preload("res://assets/dot.png")
 
 
 # Positive numbers are white, negative numbers are black; values are:
@@ -117,9 +117,9 @@ func _ready() -> void:
 	
 	# this is cleaner and faster than making a signal for each node
 	for button in white_buttons:
-		button.pressed.connect(self._on_button_pressed.bind(button))
+		button.pressed.connect(_on_button_pressed.bind(button))
 	for button in black_buttons:
-		button.pressed.connect(self._on_button_pressed.bind(button))
+		button.pressed.connect(_on_button_pressed.bind(button))
 
 
 func _input(event) -> void:
