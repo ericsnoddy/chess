@@ -81,8 +81,8 @@ var castle_type := ""
 var en_passant := Vector2()
 # for recording move history, want to know if we passant that turn
 var is_passant := false
-# square getting promoted; nonzero vector (ie, a move) triggers promotion buttons
-var promotion_square := Vector2()
+# square getting promoted; valid (non-negative) vector (ie, a move) triggers promotion buttons
+var promotion_square := Vector2(-1, 0)
 # 50 move rule - no captures >>and no pawn moves<< within 50 moves = offered draw
 var fifty_moves := 0
 # threefold rule - 3 non-unique boards = can offer draw on or after 3rd unique
@@ -96,11 +96,11 @@ var unique_board_moves: Array = []
 var num_unique_moves: Array = []
 
 
-@onready var pieces := $Pieces
-@onready var dots := $Dots
-@onready var turn := $Turn
-@onready var white_pieces: Control = $"../CanvasLayer/white_pieces"
-@onready var black_pieces: Control = $"../CanvasLayer/black_pieces"
+@onready var pieces : Node2D = $Pieces
+@onready var move_dots : Node2D = $Dots
+@onready var turn_indicator : Sprite2D = $Turn
+@onready var white_promo_pieces: Control = $"../CanvasLayer/white_pieces"
+@onready var black_promo_pieces: Control = $"../CanvasLayer/black_pieces"
 
 
 # Called when the node enters the scene tree for the first time.
@@ -132,7 +132,7 @@ func _ready() -> void:
 
 func _input(event) -> void:
 	# (if there's a promotion we don't want to register the selection click here)
-	if event is InputEventMouseButton and event.pressed and promotion_square == Vector2.ZERO:
+	if event is InputEventMouseButton and event.pressed and promotion_square.x < 0:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			# don't register interaction if mouse is outside area of the board
 			if is_mouse_out(): 
@@ -146,7 +146,7 @@ func _input(event) -> void:
 			
 			# Route the click depending on the state
 			# make sure the selected position is eligible before showing options
-			if state == "selecting" and (white and board[row][col] > 0 or not white and board[row][col] < 0):
+			if state == "selecting" and (white and board[row][col] > 0 or !white and board[row][col] < 0):
 				selected_piece = Vector2(row, col)
 				show_options()
 				state = "confirming"
@@ -158,7 +158,7 @@ func _input(event) -> void:
 
 
 func _on_button_pressed(button: Node) -> void:
-	# get the piece value from the name and ensure it's 1 char
+	# get the piece value from the name (ensure it's 1 char)
 	var val : int = int(button.name.substr(0,1))
 	
 	# record history before updating board
@@ -180,11 +180,11 @@ func _on_button_pressed(button: Node) -> void:
 	# update board. 'white' switched after we landed on promo square, so we 
 	# have to take into account that white == !white when assigning value
 	board[promotion_square.x][promotion_square.y] = -val if white else val
-	# hide the promotion buttons
-	white_pieces.visible = false
-	black_pieces.visible = false
-	# reset the promotion square - this is how we hi-jacked LEFT_CLICK
-	promotion_square = Vector2.ZERO
+	# hide the promotion buttons - see promote() for showing the buttons
+	white_promo_pieces.visible = false
+	black_promo_pieces.visible = false
+	# reset the promo square to default (invalid) value - this is how we hi-jacked LEFT_CLICK
+	promotion_square = Vector2(-1, 0)
 	display_board()
 
 
@@ -226,9 +226,9 @@ func display_board() -> void:
 	
 	# display turn marker
 	if white: 
-		turn.texture = TURN_WHITE
+		turn_indicator.texture = TURN_WHITE
 	else: 
-		turn.texture = TURN_BLACK
+		turn_indicator.texture = TURN_BLACK
 
 
 func get_moves(selected: Vector2) -> Array:
@@ -439,12 +439,12 @@ func show_dots(to_show: bool = true) -> void:
 		for move in moves:
 			# we just change the image of a single sprite to draw all the dots
 			var holder : Node = TEXTURE_HOLDER.instantiate()
-			dots.add_child(holder)
+			move_dots.add_child(holder)
 			holder.texture = PIECE_MOVE
 			holder.global_position = Vector2(move.y * CELL_WIDTH + HALF_CELL, -move.x * CELL_WIDTH - HALF_CELL)
 	# else delete the dots
 	else:
-		for child in dots.get_children():
+		for child in move_dots.get_children():
 			child.queue_free()
 
 
@@ -626,8 +626,8 @@ func is_opponent(coords: Vector2) -> bool:
 func promote(_promotion_square: Vector2) -> void:
 	promotion_square = _promotion_square
 	# See _ready() for initializing this button display
-	white_pieces.visible = white
-	black_pieces.visible = !white
+	white_promo_pieces.visible = white
+	black_promo_pieces.visible = not white
 
 
 func get_pawn_moves(pawn: Vector2) -> Array[Vector2]:
