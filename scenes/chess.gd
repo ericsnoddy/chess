@@ -681,6 +681,7 @@ func get_pawn_moves(pawn: Vector2) -> Array[Vector2]:
 		board[pos.x][pos.y] = 0
 		board[pawn.x][pawn.y] = 1 if white else -1
 	
+	# Handle pawns opening 2 spaces
 	if is_first_move:
 		pos = pawn + direction * 2
 		if is_empty(pawn + direction) and is_empty(pos):
@@ -853,7 +854,7 @@ func get_queen_moves(queen: Vector2) -> Array[Vector2]:
 		Vector2(0,-1),Vector2(0,1), Vector2(1,0), Vector2(-1,0),
 		Vector2(1,-1), Vector2(-1,-1), Vector2(1,1), Vector2(-1,1)
 	]
-	
+
 	for dir in directions:
 		var pos : Vector2 = queen
 		pos += dir
@@ -870,11 +871,15 @@ func get_queen_moves(queen: Vector2) -> Array[Vector2]:
 				# reverse
 				board[pos.x][pos.y] = 0
 				board[queen.x][queen.y] = 5 if white else -5
+				
 			elif is_opponent(pos):
 				var temp = board[pos.x][pos.y]
 				board[pos.x][pos.y] = 5 if white else -5
 				board[queen.x][queen.y] = 0
-				if (white and !is_in_check(white_king_pos)) or (!white and !is_in_check(black_king_pos)):
+				if (
+						white and not is_in_check(white_king_pos)
+						or !white and not is_in_check(black_king_pos)
+				):
 					_moves.append(pos)
 				# reverse
 				board[pos.x][pos.y] = temp
@@ -903,30 +908,41 @@ func get_king_moves(king: Vector2) -> Array[Vector2]:
 	for dir in directions:
 		var pos : Vector2 = king + dir
 		if is_in_bounds(pos):
-			if !is_in_check(pos):
+			if not is_in_check(pos):
 				if is_empty(pos) or is_opponent(pos): 
 					_moves.append(pos)
 			
 	# check castle eligibility and return moves
-	if white and !king_moved["white"]:
-		if !rook_moved["white left"]:
-			if is_empty(Vector2(0,3)) and !is_in_check(Vector2(0,3)) and\
-				is_empty(Vector2(0,2)) and !is_in_check(Vector2(0,2)) and\
-				is_empty(Vector2(0,1)) and !is_in_check(Vector2(0,1)):
+	if white and not king_moved["white"]:
+		if not rook_moved["white left"]:
+			if (
+					is_empty(Vector2(0,3)) and not is_in_check(Vector2(0,3))
+					and is_empty(Vector2(0,2)) and not is_in_check(Vector2(0,2))
+					and is_empty(Vector2(0,1)) and not is_in_check(Vector2(0,1))
+			):
 				_moves.append(Vector2(0,2))
-		if !rook_moved["white right"]:
-			if is_empty(Vector2(0,5)) and !is_in_check(Vector2(0,5)) and\
-				is_empty(Vector2(0,6)) and !is_in_check(Vector2(0,6)):
+				
+		if not rook_moved["white right"]:
+			if (
+					is_empty(Vector2(0,5)) and not is_in_check(Vector2(0,5))
+					and is_empty(Vector2(0,6)) and not is_in_check(Vector2(0,6))
+			):
 				_moves.append(Vector2(0,6))
-	elif !white and !king_moved["black"]:
-		if !rook_moved["black left"]:
-			if is_empty(Vector2(7,3)) and !is_in_check(Vector2(7,3)) and\
-				is_empty(Vector2(7,2)) and !is_in_check(Vector2(7,2)) and\
-				is_empty(Vector2(7,1)) and !is_in_check(Vector2(7,1)):
+		
+	elif !white and not king_moved["black"]:
+		if not rook_moved["black left"]:
+			if (
+					is_empty(Vector2(7,3)) and not is_in_check(Vector2(7,3))
+					and is_empty(Vector2(7,2)) and not is_in_check(Vector2(7,2))
+					and is_empty(Vector2(7,1)) and not is_in_check(Vector2(7,1))
+			):
 				_moves.append(Vector2(7,2))
-		if !rook_moved["black right"]:
-			if is_empty(Vector2(7,5)) and !is_in_check(Vector2(7,5)) and\
-				is_empty(Vector2(7,6)) and !is_in_check(Vector2(7,6)):
+				
+		if not rook_moved["black right"]:
+			if (
+					is_empty(Vector2(7,5)) and not is_in_check(Vector2(7,5))
+					and is_empty(Vector2(7,6)) and not is_in_check(Vector2(7,6))
+			):
 				_moves.append(Vector2(7,6))
 				
 	# Unhide the king
