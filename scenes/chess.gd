@@ -52,8 +52,8 @@ var moves : Array[Vector2] = []
 # move number
 var move_number := 0
 # pos of currently selected piece board[0][0] -> Vector2(0, 0)
-var selected_piece : Vector2
-# Move history management... see record_history() for keys/parameters
+var selected_piece_pos : Vector2
+# Move history management... see record_history() for parameters
 var history : Array[Dictionary] = []
 # had to make this move history datum global because I'm not clever enough
 var captured_val := 0
@@ -77,12 +77,12 @@ var rook_moved : Dictionary[String, bool] = {
 # track data for long/short castling - used for displaying move history
 var castle_type := ""
 # holds the position of a pawn eligible to be captured by en passant
-var en_passant := Vector2()
+var en_passant_pos : Vector2
 # for recording move history, want to know if we passant that turn
 var is_passant := false
-# square getting promoted; valid (in bounds) vector triggers promotion buttons
+# square getting promoted; valid (in bounds) position reroutes click handling
 var promotion_square := Vector2(-1, 0)
-# 50 move rule - no captures >>and no pawn moves<< within 50 moves = offered draw
+# 50 move rule - no captures and no pawn moves within 50 moves = offered draw
 var fifty_moves := 0
 # threefold rule - 3 non-unique boards = can offer draw on or after 3rd unique
 # fivefold rule - automatic draw
@@ -147,7 +147,7 @@ func _input(event) -> void:
 			# Route the click depending on the state
 			# make sure the selected position is eligible before showing options
 			if state == "selecting" and (white and board[row][col] > 0 or !white and board[row][col] < 0):
-				selected_piece = Vector2(row, col)
+				selected_piece_pos = Vector2(row, col)
 				show_options()
 				state = "confirming"
 
@@ -206,12 +206,12 @@ func get_moves(selected: Vector2) -> Array:
 	var target : int = board[selected.x][selected.y]
 	# Remember vars are relative to the Array so here x is the ROW not the column
 	match abs(target):
-		1: valid_moves = get_pawn_moves(selected_piece)
-		2: valid_moves = get_knight_moves(selected_piece)
-		3: valid_moves = get_bishop_moves(selected_piece)
-		4: valid_moves = get_rook_moves(selected_piece)
-		5: valid_moves = get_queen_moves(selected_piece)
-		6: valid_moves = get_king_moves(selected_piece)
+		1: valid_moves = get_pawn_moves(selected_piece_pos)
+		2: valid_moves = get_knight_moves(selected_piece_pos)
+		3: valid_moves = get_bishop_moves(selected_piece_pos)
+		4: valid_moves = get_rook_moves(selected_piece_pos)
+		5: valid_moves = get_queen_moves(selected_piece_pos)
+		6: valid_moves = get_king_moves(selected_piece_pos)
 	return valid_moves
 
 
@@ -226,28 +226,28 @@ func set_move(row: int, col: int) -> void:
 			captured_val = board[move.x][move.y]
 			# OK FUCK let's try a match statement and just handle individual pieces
 			# see if this works for christsakes
-			match board[selected_piece.x][selected_piece.y]:
+			match board[selected_piece_pos.x][selected_piece_pos.y]:
 				1:
 					# pawn promotion
 					if move.x == 7:
 						promote(move)
 					# en passant
 					# mark our pawn as eligible to be captured by en passant
-					if move.x == 3 and selected_piece.x == 1:
-						en_passant = move
+					if move.x == 3 and selected_piece_pos.x == 1:
+						en_passant_pos = move
 						pawn_just_moved = true
 					# if we're a different pawn & one is eligible to capture by passant...
-					# let's see if we can capture it
-					elif en_passant.length() > 0:
+					# add move if it can be captured
+					elif en_passant_pos.length() > 0:
 						# check if col of eligible pawn matches col of move +
 						# check that we're not moving vertically +
 						# check that row of eligible pawn == starting row of move
 						# There, did I catch all the damn edge cases???
 						if (
-								en_passant.y == move.y and selected_piece.y != move.y
-								and en_passant.x == selected_piece.x
+								en_passant_pos.y == move.y and selected_piece_pos.y != move.y
+								and en_passant_pos.x == selected_piece_pos.x
 						):
-							board[en_passant.x][en_passant.y] = 0
+							board[en_passant_pos.x][en_passant_pos.y] = 0
 							# data for move history
 							is_passant = true
 							captured_val = -1
@@ -255,36 +255,36 @@ func set_move(row: int, col: int) -> void:
 				-1:
 					if move.x == 0:
 						promote(move)
-					if move.x == 4 and selected_piece.x == 6:
-						en_passant = move
+					if move.x == 4 and selected_piece_pos.x == 6:
+						en_passant_pos = move
 						pawn_just_moved = true
-					elif en_passant.length() > 0:
+					elif en_passant_pos.length() > 0:
 						if (
-								en_passant.y == move.y and selected_piece.y != move.y
-								and en_passant.x == selected_piece.x
+								en_passant_pos.y == move.y and selected_piece_pos.y != move.y
+								and en_passant_pos.x == selected_piece_pos.x
 						):
-							board[en_passant.x][en_passant.y] = 0
+							board[en_passant_pos.x][en_passant_pos.y] = 0
 							is_passant = true
 							captured_val = 1
 					
 				4:  # we need to know if rooks moved for castling eligibility
-					if selected_piece.x == 0 and selected_piece.y == 0:
+					if selected_piece_pos.x == 0 and selected_piece_pos.y == 0:
 						rook_moved["white left"] = true
-					elif selected_piece.x == 0 and selected_piece.y == 7:
+					elif selected_piece_pos.x == 0 and selected_piece_pos.y == 7:
 						rook_moved["white right"] = true
 					
 				-4: 
-					if selected_piece.x == 7 and selected_piece.y == 0:
+					if selected_piece_pos.x == 7 and selected_piece_pos.y == 0:
 						rook_moved["black left"] = true
-					elif selected_piece.x == 7 and selected_piece.y == 7:
+					elif selected_piece_pos.x == 7 and selected_piece_pos.y == 7:
 						rook_moved["black right"] = true
 						
 				6:
 					# castling
-					if selected_piece.x == 0 and selected_piece.y == 4:
+					if selected_piece_pos.x == 0 and selected_piece_pos.y == 4:
 						king_moved["white"] = true
 						# if the king moved 2 units he must have castled
-						if move.y == selected_piece.y - 2:
+						if move.y == selected_piece_pos.y - 2:
 							castle_type = "long"
 							# saves computation elsewhere to set both rooks to moved
 							# we don't care about their movement anymore after castling
@@ -292,7 +292,7 @@ func set_move(row: int, col: int) -> void:
 							rook_moved["white right"] = true
 							board[0][0] = 0
 							board[0][3] = 4
-						elif move.y == selected_piece.y + 2:
+						elif move.y == selected_piece_pos.y + 2:
 							rook_moved["white left"] = true
 							rook_moved["white right"] = true
 							castle_type = "short"
@@ -302,15 +302,15 @@ func set_move(row: int, col: int) -> void:
 					white_king_pos = Vector2(move.x, move.y)
 					
 				-6:
-					if selected_piece.x == 7 and selected_piece.y == 4:
+					if selected_piece_pos.x == 7 and selected_piece_pos.y == 4:
 						king_moved["black"] = true
-						if move.y == selected_piece.y - 2:
+						if move.y == selected_piece_pos.y - 2:
 							castle_type = "long"
 							rook_moved["black left"] = true
 							rook_moved["black right"] = true
 							board[7][0] = 0
 							board[7][3] = -4
-						elif move.y == selected_piece.y + 2:
+						elif move.y == selected_piece_pos.y + 2:
 							castle_type = "short"
 							rook_moved["black left"] = true
 							rook_moved["black right"] = true
@@ -320,11 +320,11 @@ func set_move(row: int, col: int) -> void:
 					black_king_pos = Vector2(move.x, move.y)
 	
 			# value of the selected piece
-			var selected_value : int = board[selected_piece.x][selected_piece.y]
+			var selected_value : int = board[selected_piece_pos.x][selected_piece_pos.y]
 			# update the board to reflect value of the moved piece
 			board[row][col] = selected_value
 			# update the exiting square in board to show empty
-			board[selected_piece.x][selected_piece.y] = 0
+			board[selected_piece_pos.x][selected_piece_pos.y] = 0
 			
 			# add a dictionary of data to history array
 			# but not if promoting -- record is called in that loop
@@ -332,12 +332,12 @@ func set_move(row: int, col: int) -> void:
 				pass
 			else:
 				record_history(
-					selected_piece,
+					selected_piece_pos,
 					move,
 					selected_value,
 					captured_val,
 					is_passant,
-					null,
+					0, # 0 = no promotion this move
 				)
 				# DEBUG PRINT
 				print(history.back())
@@ -348,7 +348,7 @@ func set_move(row: int, col: int) -> void:
 				
 			# reset/update game variables
 			if not pawn_just_moved: 
-				en_passant = Vector2.ZERO
+				en_passant_pos = Vector2.ZERO
 			is_passant = false
 			castle_type = ""
 			white = !white
@@ -363,10 +363,10 @@ func set_move(row: int, col: int) -> void:
 	# one-click reselect functionality
 	if (
 			# if another piece is selected and it is the player's turn...
-			(selected_piece.x != row or selected_piece.y != col) 
+			(selected_piece_pos.x != row or selected_piece_pos.y != col) 
 			and (white and board[row][col] > 0 or !white and board[row][col] < 0)
 	):
-		selected_piece = Vector2(row, col)
+		selected_piece_pos = Vector2(row, col)
 		show_options()
 		state = "confirming"
 	
@@ -378,7 +378,7 @@ func set_move(row: int, col: int) -> void:
 		print("DRAW: Insufficient material")
 
 
-func record_history(start_pos: Vector2, end_pos: Vector2, piece_val: int, capture_val: int, passant: bool, promo) -> void:
+func record_history(start_pos: Vector2, end_pos: Vector2, piece_val: int, capture_val: int, passant: bool, promo: int) -> void:
 	# increment move
 	move_number += 1
 	
@@ -395,7 +395,7 @@ func record_history(start_pos: Vector2, end_pos: Vector2, piece_val: int, captur
 
 
 func show_options() -> void:
-	moves = get_moves(selected_piece)
+	moves = get_moves(selected_piece_pos)
 	# If there are no legal moves, revert to previous state
 	if moves.is_empty():
 		state = "selecting"
@@ -623,16 +623,16 @@ func get_pawn_moves(pawn: Vector2) -> Array[Vector2]:
 	# if there are eligible captures and the pawn is on an eligible row
 	# and the opponent is exactly 1 col away, we can add the move
 	if (
-			en_passant.length() > 0 
+			en_passant_pos.length() > 0 
 			and (white and pawn.x == 4 or !white and pawn.x == 3)
-			and abs(en_passant.y - pawn.y) == 1
+			and abs(en_passant_pos.y - pawn.y) == 1
 	):
 		var passant_pos : Vector2 = pawn + direction
 		# Temporarily move the pawns in order to test if moving them will put 
 		# the king in check. If not: OK
 		board[passant_pos.x][passant_pos.y] = 1 if white else -1
 		board[pawn.x][pawn.y] = 0
-		board[en_passant.x][en_passant.y] = 0
+		board[en_passant_pos.x][en_passant_pos.y] = 0
 		if (
 				white and not is_in_check(white_king_pos)
 				or !white and not is_in_check(black_king_pos)
@@ -641,9 +641,9 @@ func get_pawn_moves(pawn: Vector2) -> Array[Vector2]:
 		# reverse the temporary pawn moves
 		board[passant_pos.x][passant_pos.y] = 0
 		board[pawn.x][pawn.y] = 1 if white else -1
-		board[en_passant.x][en_passant.y] = -1 if white else 1
+		board[en_passant_pos.x][en_passant_pos.y] = -1 if white else 1
 		# the move will be the capture space + vertical direction determined by color
-		_moves.append(en_passant + direction)
+		_moves.append(en_passant_pos + direction)
 	
 	# check verticals
 	var pos : Vector2 = pawn + direction
@@ -940,7 +940,7 @@ func _on_button_pressed(button: Node) -> void:
 	# record history before updating board
 	var selected_value: int = board[promotion_square.x][promotion_square.y]
 	record_history( 
-			selected_piece, 
+			selected_piece_pos, 
 			promotion_square, 
 			selected_value, 
 			captured_val, 
