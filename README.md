@@ -1,3 +1,7 @@
-Chess piece assets c/o https://ryisnow.itch.io/pixel-art-chess-piece-images
+Chess piece assets c/o RyiSnow: https://ryisnow.itch.io/pixel-art-chess-piece-images
 
-Board and turn indicator assets and instruction c/o https://youtu.be/1y57hJo1ONQ?si=fD72g4t1jbbDWmTb
+Board and turn indicator assets and instruction c/o @Godot-with-me:
+
+https://www.dropbox.com/scl/fi/2djub1uzxr0le7gzvum6i/Chess.zip?rlkey=azjjrymi1ijameyp95xlimxr0&e=1&st=anihct6c&dl=0
+
+https://youtube.com/@godot-with-me?si=7xx3CK3eKgy5Cn7-
