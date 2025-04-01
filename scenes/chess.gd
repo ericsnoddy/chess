@@ -47,7 +47,7 @@ var board : Array[Array]
 # white's turn = true, black's turn = false
 var white := true
 # Two states for routing click input: "selecting" and "confirming"
-var state : String = "selecting"
+var state := "selecting"
 # hold possible moves for currently selected piece
 var moves : Array[Vector2] = []
 # move number
@@ -81,7 +81,7 @@ var castle_type := ""
 var en_passant := Vector2()
 # for recording move history, want to know if we passant that turn
 var is_passant := false
-# square getting promoted; valid (non-negative) vector (ie, a move) triggers promotion buttons
+# square getting promoted; valid (in bounds) vector triggers promotion buttons
 var promotion_square := Vector2(-1, 0)
 # 50 move rule - no captures >>and no pawn moves<< within 50 moves = offered draw
 var fifty_moves := 0
@@ -105,7 +105,7 @@ var num_unique_moves: Array = []
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
-	# bottom-left is [0,0]: see key above for piece values
+	# bottom-left is [0,0]
 	board.append([4, 2, 3, 5, 6, 3, 2, 4]) # white pieces, [0,0] -> [0,7]
 	board.append([1, 1, 1, 1, 1, 1, 1, 1]) # [1,0] -> [1,7]
 	board.append([0, 0, 0, 0, 0, 0, 0, 0])
@@ -115,21 +115,22 @@ func _ready() -> void:
 	board.append([-1, -1, -1, -1, -1, -1, -1, -1])
 	board.append([-4, -2, -3, -5, -6, -3, -2, -4]) # [7,0] -> [7,7]
 	
-	
-	# only calls display_board() once on _ready - make sure to call it below in the game loop
+	# Called once here; see game loop for further display
 	display_board()
 	
+	# PAWN PROMOTION
 	# init buttons for corresponding promotion options
 	var white_buttons : Array[Node] = get_tree().get_nodes_in_group("white_pieces")
 	var black_buttons : Array[Node] = get_tree().get_nodes_in_group("black_pieces")
 	
-	# this is cleaner and faster than making a signal for each node
+	# connect button_pressed signals by iterating over the button groups
 	for button in white_buttons:
 		button.pressed.connect(_on_button_pressed.bind(button))
 	for button in black_buttons:
 		button.pressed.connect(_on_button_pressed.bind(button))
 
 
+# Handle input for most input events
 func _input(event) -> void:
 	# (if there's a promotion we don't want to register the selection click here)
 	if event is InputEventMouseButton and event.pressed and promotion_square.x < 0:
@@ -155,37 +156,6 @@ func _input(event) -> void:
 			elif state == "confirming":
 				# if another piece is selected before moving, remove dots, change state
 				set_move(row, col)
-
-
-func _on_button_pressed(button: Node) -> void:
-	# get the piece value from the name (ensure it's 1 char)
-	var val : int = int(button.name.substr(0,1))
-	
-	# record history before updating board
-	record_history( 
-			selected_piece, 
-			promotion_square, 
-			board[promotion_square.x][promotion_square.y], 
-			captured_val, 
-			false, 
-			val,
-	)
-	
-	print(history.back())
-	
-	# incrememnt the fifty moves counter if appropriate
-	incr_fifty_moves()
-	check_unique_board(board)
-	
-	# update board. 'white' switched after we landed on promo square, so we 
-	# have to take into account that white == !white when assigning value
-	board[promotion_square.x][promotion_square.y] = -val if white else val
-	# hide the promotion buttons - see promote() for showing the buttons
-	white_promo_pieces.visible = false
-	black_promo_pieces.visible = false
-	# reset the promo square to default (invalid) value - this is how we hi-jacked LEFT_CLICK
-	promotion_square = Vector2(-1, 0)
-	display_board()
 
 
 func incr_fifty_moves() -> void:
@@ -316,7 +286,7 @@ func set_move(row: int, col: int) -> void:
 						# if the king moved 2 units he must have castled
 						if move.y == selected_piece.y - 2:
 							castle_type = "long"
-							# saves on computation elsewhere to set both rooks to moved
+							# saves computation elsewhere to set both rooks to moved
 							# we don't care about their movement anymore after castling
 							rook_moved["white left"] = true
 							rook_moved["white right"] = true
@@ -358,7 +328,7 @@ func set_move(row: int, col: int) -> void:
 			
 			# add a dictionary of data to history array
 			# but not if promoting -- record is called in that loop
-			if white and move.x == 7 or not white and move.x == 0:
+			if white and move.x == 7 or !white and move.x == 0:
 				pass
 			else:
 				record_history(
@@ -381,7 +351,7 @@ func set_move(row: int, col: int) -> void:
 				en_passant = Vector2.ZERO
 			is_passant = false
 			castle_type = ""
-			white = not white
+			white = !white
 			# The piece sprites are instantiated children of TextureHolder so they 
 			# will persist unless killed - this is handled by display_board()
 			display_board()
@@ -394,7 +364,7 @@ func set_move(row: int, col: int) -> void:
 	if (
 			# if another piece is selected and it is the player's turn...
 			(selected_piece.x != row or selected_piece.y != col) 
-			and (white and board[row][col] > 0 or not white and board[row][col] < 0)
+			and (white and board[row][col] > 0 or !white and board[row][col] < 0)
 	):
 		selected_piece = Vector2(row, col)
 		show_options()
@@ -506,9 +476,8 @@ func is_dead_position() -> bool:
 			white_knights == 0 and white_bishops == 0 and black_knights == 0 and black_bishops <= 1
 			# King + Knights <= 2
 			or white_knights == 0 and white_bishops == 0 and black_knights <= 2 and black_bishops == 0
-			# King + Bishops < 2 (also captures King vs King)
-			or black_knights == 0 and black_bishops == 0 and white_knights == 0 and white_bishops < 2
-			# King + Knights <= 2
+			# Repeat for black
+			or black_knights == 0 and black_bishops == 0 and white_knights == 0 and white_bishops <= 1
 			or black_knights == 0 and black_bishops == 0 and white_knights <= 2 and white_bishops == 0
 	):
 		# insufficient material confirmed
@@ -625,9 +594,9 @@ func is_opponent(coords: Vector2) -> bool:
 
 func promote(_promotion_square: Vector2) -> void:
 	promotion_square = _promotion_square
-	# See _ready() for initializing this button display
+	# See _ready() for initializing this button display - 'white' is a boolean
 	white_promo_pieces.visible = white
-	black_promo_pieces.visible = not white
+	black_promo_pieces.visible = !white
 
 
 func get_pawn_moves(pawn: Vector2) -> Array[Vector2]:
@@ -962,3 +931,34 @@ func get_king_moves(king: Vector2) -> Array[Vector2]:
 		board[black_king_pos.x][black_king_pos.y] = -6
 	
 	return _moves
+
+
+func _on_button_pressed(button: Node) -> void:
+	# get the piece value from the name (ensure it's 1 char)
+	var val : int = int(button.name.substr(0,1))
+	
+	# record history before updating board
+	record_history( 
+			selected_piece, 
+			promotion_square, 
+			board[promotion_square.x][promotion_square.y], 
+			captured_val, 
+			false, 
+			val,
+	)
+	
+	print(history.back())
+	
+	# incrememnt the fifty moves counter if appropriate
+	incr_fifty_moves()
+	check_unique_board(board)
+	
+	# update board. 'white' switched after we landed on promo square, so we 
+	# have to take into account that white == !white when assigning value
+	board[promotion_square.x][promotion_square.y] = -val if white else val
+	# hide the promotion buttons - see promote() for showing the buttons
+	white_promo_pieces.visible = false
+	black_promo_pieces.visible = false
+	# reset the promo square to default (invalid) value - this is how we hi-jacked LEFT_CLICK
+	promotion_square = Vector2(-1, 0)
+	display_board()
