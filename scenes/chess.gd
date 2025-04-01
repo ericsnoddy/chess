@@ -2,14 +2,15 @@ extends Sprite2D
 
 
 ## TODO
+# 50 move rule needs added condition that no pawns moved
 # Stop the game when it's over
 # Stalemate: the player to move is not in check and has no legal move
-# obvious ones: KvK, KvKB, KvKN, blocked pos where only preceding pieces can move
 # Indicate check
 # checkmate - indicate checkmate
 # displaying proper move history
 # Resignation / offer draw
 # if opponent resigns but game is dead position: actually a draw
+# multiplayer support
 
 const BOARD_SIZE := 8
 const CELL_WIDTH := 18
@@ -39,44 +40,51 @@ const TURN_BLACK = preload("res://assets/turn-black.png")
 const TURN_WHITE = preload("res://assets/turn-white.png")
 const PIECE_MOVE = preload("res://assets/dot.png")
 
-
+# Hold the position of a piece: board[0][0] is value of piece at [0,0]
 # Positive numbers are white, negative numbers are black; values are:
 # 6 King 5 Queen 4 Rook 3 Bishop 2 Knight 1 Pawn 0 (empty square)
-# variables
-# hold the position of a piece: board[0][0] is index of piece at [0,0]
 var board : Array[Array]
 # white's turn = true, black's turn = false
 var white := true
-# Two states for the player: false == "selecting" and true == "confirming"
+# Two states for routing click input: "selecting" and "confirming"
 var state : String = "selecting"
 # hold possible moves for currently selected piece
 var moves : Array[Vector2] = []
 # move number
-var move_number : int = 0
-# pos of currently selected piece
+var move_number := 0
+# pos of currently selected piece board[0][0] -> Vector2(0, 0)
 var selected_piece : Vector2
-# Move history management... see record_history(...) for keys/parameters
+# Move history management... see record_history() for keys/parameters
 var history : Array[Dictionary] = []
 # had to make this move history datum global because I'm not clever enough
-var captured_val : int = 0
+var captured_val := 0
+
 # SPECIAL HANDLING
-# kings' up-to-date position
+# kings' "up-to-date" position
 var white_king_pos := Vector2(0,4)
 var black_king_pos := Vector2(7,4)
 # once king moves it is ineligible for castling
-var king_moved : Dictionary[String, bool] = { "white" : false, "black" : false }
+var king_moved : Dictionary[String, bool] = { 
+	"white" : false, 
+	"black" : false,
+}
 # Same for the castling rook
-var rook_moved : Dictionary[String, bool] = { "white left" : false, "black left" : false, "white right" : false, "black right" : false }
-# track data for long/short castling
+var rook_moved : Dictionary[String, bool] = { 
+	"white left" : false, 
+	"black left" : false, 
+	"white right" : false, 
+	"black right" : false,
+}
+# track data for long/short castling - used for displaying move history
 var castle_type := ""
 # holds the position of a pawn eligible to be captured by en passant
 var en_passant := Vector2()
 # for recording move history, want to know if we passant that turn
-var is_passant : bool = false
-# square getting promoted; nonzero vector (move) triggers promotion buttons
+var is_passant := false
+# square getting promoted; nonzero vector (ie, a move) triggers promotion buttons
 var promotion_square := Vector2()
-# 50 move rule - no captures within 50 moves = draw
-var fifty_moves : int = 0
+# 50 move rule - no captures >>and no pawn moves<< within 50 moves = offered draw
+var fifty_moves := 0
 # threefold rule - 3 non-unique boards = can offer draw on or after 3rd unique
 # fivefold rule - automatic draw
 # Positions are considered the same if
@@ -419,7 +427,7 @@ func record_history(start_pos: Vector2, end_pos: Vector2, piece_val: int, captur
 func show_options() -> void:
 	moves = get_moves(selected_piece)
 	# If there are no legal moves, revert to previous state
-	if moves == []:
+	if moves.is_empty():
 		state = "selecting"
 		return
 	show_dots()
