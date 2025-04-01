@@ -2,7 +2,6 @@ extends Sprite2D
 
 
 ## TODO
-# 50 move rule needs added condition that no pawns moved
 # Stop the game when it's over
 # Stalemate: the player to move is not in check and has no legal move
 # Indicate check
@@ -158,8 +157,9 @@ func _input(event) -> void:
 				set_move(row, col)
 
 
-func incr_fifty_moves() -> void:
-	if captured_val == 0:
+func incr_fifty_moves(_selected_value: int) -> void:
+	# If no captures and no pawn moves for 50 turns -> offered draw
+	if captured_val == 0 and abs(_selected_value) != 1:
 		fifty_moves += 1
 	else:
 		fifty_moves = 0
@@ -342,7 +342,7 @@ func set_move(row: int, col: int) -> void:
 				# DEBUG PRINT
 				print(history.back())
 			# increment 50 moves counter if appropriate
-			incr_fifty_moves()
+			incr_fifty_moves(selected_value)
 			# three/fivefold rule
 			check_unique_board(board)
 				
@@ -450,7 +450,7 @@ func is_dead_position() -> bool:
 			match board[i][j]:
 				2:
 					# count knights
-					white_knights += 1					
+					white_knights += 1
 				-2:
 					black_knights += 1
 				3:
@@ -473,8 +473,8 @@ func is_dead_position() -> bool:
 			# At this point we know there are no pawns, rooks, queens, or bishops > 1
 			# (Probably a more elegant way of doing this)
 			# King + Bishops <= 1 (also captures King vs King)
-			white_knights == 0 and white_bishops == 0 and black_knights == 0 and black_bishops <= 1
 			# King + Knights <= 2
+			white_knights == 0 and white_bishops == 0 and black_knights == 0 and black_bishops <= 1
 			or white_knights == 0 and white_bishops == 0 and black_knights <= 2 and black_bishops == 0
 			# Repeat for black
 			or black_knights == 0 and black_bishops == 0 and white_knights == 0 and white_bishops <= 1
@@ -938,10 +938,11 @@ func _on_button_pressed(button: Node) -> void:
 	var val : int = int(button.name.substr(0,1))
 	
 	# record history before updating board
+	var selected_value: int = board[promotion_square.x][promotion_square.y]
 	record_history( 
 			selected_piece, 
 			promotion_square, 
-			board[promotion_square.x][promotion_square.y], 
+			selected_value, 
 			captured_val, 
 			false, 
 			val,
@@ -950,7 +951,7 @@ func _on_button_pressed(button: Node) -> void:
 	print(history.back())
 	
 	# incrememnt the fifty moves counter if appropriate
-	incr_fifty_moves()
+	incr_fifty_moves(selected_value)
 	check_unique_board(board)
 	
 	# update board. 'white' switched after we landed on promo square, so we 
