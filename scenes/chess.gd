@@ -11,11 +11,12 @@ extends Sprite2D
 # Resignation / offer draw
 # if opponent resigns but game is dead position: actually a draw
 
-const BOARD_SIZE = 8
-const CELL_WIDTH = 18
+const BOARD_SIZE := 8
+const CELL_WIDTH := 18
 @warning_ignore("integer_division")
-const HALF_CELL = CELL_WIDTH / 2
-const BOARD_LENGTH = CELL_WIDTH * 8
+const HALF_CELL : int = CELL_WIDTH / 2
+const BOARD_LENGTH : int = CELL_WIDTH * 8
+const TEXTURE_SCALE : float = 16 / 100.0
 
 # empty Sprite2D to display the pieces
 const TEXTURE_HOLDER = preload("res://scenes/texture_holder.tscn")
@@ -198,6 +199,7 @@ func display_board() -> void:
 			var holder : Sprite2D = TEXTURE_HOLDER.instantiate()
 			pieces.add_child(holder)
 			holder.global_position = Vector2(col * CELL_WIDTH + HALF_CELL, -row * CELL_WIDTH - HALF_CELL)
+			holder.scale *= TEXTURE_SCALE
 	
 			match board[row][col]:
 				-6: holder.texture = BLACK_KING

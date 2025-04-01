@@ -1,90 +1,90 @@
 [gd_scene load_steps=36 format=3 uid="uid://bds2hr704t4tj"]
 
-[ext_resource type="Texture2D" uid="uid://dr1joj5cx53ki" path="res://assets_old/white_knight.png" id="1_rf6ae"]
 [ext_resource type="PackedScene" uid="uid://bkg3clffne21g" path="res://scenes/board.tscn" id="1_y8b70"]
-[ext_resource type="Texture2D" uid="uid://dm5ceup0mm0y3" path="res://assets_old/white_bishop.png" id="2_evkj7"]
-[ext_resource type="Texture2D" uid="uid://yha6fa30bq81" path="res://assets_old/white_rook.png" id="3_a1yri"]
-[ext_resource type="Texture2D" uid="uid://dahkxppyqyao7" path="res://assets_old/white_queen.png" id="4_127ft"]
-[ext_resource type="Texture2D" uid="uid://b4ja57p3tgq54" path="res://assets_old/black_knight.png" id="5_bltry"]
-[ext_resource type="Texture2D" uid="uid://bskss11qmdkjs" path="res://assets_old/black_bishop.png" id="6_4mely"]
-[ext_resource type="Texture2D" uid="uid://bthsebulbsc7m" path="res://assets_old/black_rook.png" id="7_ppnhm"]
-[ext_resource type="Texture2D" uid="uid://dwlm7fy3a28lc" path="res://assets_old/black_queen.png" id="8_p2igy"]
+[ext_resource type="Texture2D" uid="uid://bq866lpr61yny" path="res://assets/white_knight.png" id="2_85g3d"]
+[ext_resource type="Texture2D" uid="uid://bptmj55tvvaic" path="res://assets/white_bishop.png" id="3_choun"]
+[ext_resource type="Texture2D" uid="uid://din6st5bvmlt0" path="res://assets/white_rook.png" id="4_ya4ey"]
+[ext_resource type="Texture2D" uid="uid://lkm4phwskv0s" path="res://assets/white_queen.png" id="5_eb6dy"]
+[ext_resource type="Texture2D" uid="uid://dj3g6va67wkfm" path="res://assets/black_knight.png" id="6_trceg"]
+[ext_resource type="Texture2D" uid="uid://bybh8byu7cpk" path="res://assets/black_bishop.png" id="7_a8y0u"]
+[ext_resource type="Texture2D" uid="uid://cuwg4q0lj8gxe" path="res://assets/black_rook.png" id="8_jkv2x"]
+[ext_resource type="Texture2D" uid="uid://bdbph373je1xt" path="res://assets/black_queen.png" id="9_85g3d"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_wyqly"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_5an8r"]
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_cnitw"]
-texture = ExtResource("1_rf6ae")
+texture = ExtResource("2_85g3d")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_sjk2a"]
-texture = ExtResource("1_rf6ae")
+texture = ExtResource("2_85g3d")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_g5g4e"]
-texture = ExtResource("1_rf6ae")
+texture = ExtResource("2_85g3d")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_8gopb"]
-texture = ExtResource("2_evkj7")
+texture = ExtResource("3_choun")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_6rjdn"]
-texture = ExtResource("2_evkj7")
+texture = ExtResource("3_choun")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_806rl"]
-texture = ExtResource("2_evkj7")
+texture = ExtResource("3_choun")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_hdrbb"]
-texture = ExtResource("3_a1yri")
+texture = ExtResource("4_ya4ey")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_bdgrj"]
-texture = ExtResource("3_a1yri")
+texture = ExtResource("4_ya4ey")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_6bltj"]
-texture = ExtResource("3_a1yri")
+texture = ExtResource("4_ya4ey")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_nmpjh"]
-texture = ExtResource("4_127ft")
+texture = ExtResource("5_eb6dy")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_svqih"]
-texture = ExtResource("4_127ft")
+texture = ExtResource("5_eb6dy")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_ykcn7"]
-texture = ExtResource("4_127ft")
+texture = ExtResource("5_eb6dy")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_ufdnq"]
-texture = ExtResource("5_bltry")
+texture = ExtResource("6_trceg")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_ubd8v"]
-texture = ExtResource("5_bltry")
+texture = ExtResource("6_trceg")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_i8abl"]
-texture = ExtResource("5_bltry")
+texture = ExtResource("6_trceg")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_am8gr"]
-texture = ExtResource("6_4mely")
+texture = ExtResource("7_a8y0u")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_56vpt"]
-texture = ExtResource("6_4mely")
+texture = ExtResource("7_a8y0u")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_gasjh"]
-texture = ExtResource("6_4mely")
+texture = ExtResource("7_a8y0u")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_hlj6n"]
-texture = ExtResource("7_ppnhm")
+texture = ExtResource("8_jkv2x")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_3bexu"]
-texture = ExtResource("7_ppnhm")
+texture = ExtResource("8_jkv2x")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_rot02"]
-texture = ExtResource("7_ppnhm")
+texture = ExtResource("8_jkv2x")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_g8nuo"]
-texture = ExtResource("8_p2igy")
+texture = ExtResource("9_85g3d")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_5gl8y"]
-texture = ExtResource("8_p2igy")
+texture = ExtResource("9_85g3d")
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_65qkq"]
-texture = ExtResource("8_p2igy")
+texture = ExtResource("9_85g3d")
 
 [node name="Main" type="Node2D"]
 
