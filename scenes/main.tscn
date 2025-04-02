@@ -214,6 +214,7 @@ theme_override_styles/pressed = SubResource("StyleBoxTexture_5gl8y")
 theme_override_styles/normal = SubResource("StyleBoxTexture_65qkq")
 
 [node name="CanvasLayer2" type="CanvasLayer" parent="."]
+visible = false
 
 [node name="OfferDraw" type="Label" parent="CanvasLayer2"]
 visible = false

@@ -139,7 +139,7 @@ func _input(event) -> void:
 				return
 			# nearest whole number / cell width = row/col index
 			# Coords are relative to the CanvasItem, not main display screen
-			# hence why we have to abs() the y-part - we'll use up = +y for rows
+			# so here x is always positive and y always negative
 			var mouse_pos : Vector2 = get_global_mouse_position()
 			var col : int = snapped(mouse_pos.x, 0) / CELL_WIDTH
 			var row : int = abs(snapped(mouse_pos.y, 0)) / CELL_WIDTH
@@ -157,9 +157,9 @@ func _input(event) -> void:
 				set_move(row, col)
 
 
-func incr_fifty_moves(_selected_value: int) -> void:
+func incr_fifty_moves(pawn_moved: bool) -> void:
 	# If no captures and no pawn moves for 50 turns -> offered draw
-	if captured_val == 0 and abs(_selected_value) != 1:
+	if captured_val == 0 and not pawn_moved:
 		fifty_moves += 1
 	else:
 		fifty_moves = 0
@@ -342,7 +342,8 @@ func set_move(row: int, col: int) -> void:
 				# DEBUG PRINT
 				print(history.back())
 			# increment 50 moves counter if appropriate
-			incr_fifty_moves(selected_value)
+			var pawn_moved : bool = abs(selected_value) == 1
+			incr_fifty_moves(pawn_moved)
 			# three/fivefold rule
 			check_unique_board(board)
 				
@@ -951,7 +952,8 @@ func _on_button_pressed(button: Node) -> void:
 	print(history.back())
 	
 	# incrememnt the fifty moves counter if appropriate
-	incr_fifty_moves(selected_value)
+	var pawn_moved : bool = abs(selected_value) == 1
+	incr_fifty_moves(pawn_moved)
 	check_unique_board(board)
 	
 	# update board. 'white' switched after we landed on promo square, so we 
