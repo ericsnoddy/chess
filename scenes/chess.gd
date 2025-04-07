@@ -124,9 +124,9 @@ func _ready() -> void:
 	
 	# connect button_pressed signals by iterating over the button groups
 	for button in white_buttons:
-		button.pressed.connect(_on_button_pressed.bind(button))
+		button.pressed.connect(_on_promotion_pressed.bind(button))
 	for button in black_buttons:
-		button.pressed.connect(_on_button_pressed.bind(button))
+		button.pressed.connect(_on_promotion_pressed.bind(button))
 
 
 # Handle input for most input events
@@ -157,12 +157,19 @@ func _input(event) -> void:
 				set_move(row, col)
 
 
-func incr_fifty_moves(pawn_moved: bool) -> void:
-	# If no captures and no pawn moves for 50 turns -> offered draw
-	if captured_val == 0 and not pawn_moved:
-		fifty_moves += 1
-	else:
-		fifty_moves = 0
+func check_unique_board(board_to_check: Array) -> void:
+	for b in unique_board_moves.size():
+		if board_to_check == unique_board_moves[b]:
+			num_unique_moves[b] += 1
+			if num_unique_moves[b] == 5:
+				# TODO
+				print("DRAW: Fivefold repetition rule")
+			elif num_unique_moves[b] >= 3:
+				# TODO
+				print("DRAW? Threefold repetition rule")
+			return
+	unique_board_moves.append(board_to_check.duplicate(true))
+	num_unique_moves.append(1)
 
 
 func display_board() -> void:
@@ -206,13 +213,537 @@ func get_moves(selected: Vector2) -> Array:
 	var target : int = board[selected.x][selected.y]
 	# Remember vars are relative to the Array so here x is the ROW not the column
 	match abs(target):
-		1: valid_moves = get_pawn_moves(selected_piece_pos)
-		2: valid_moves = get_knight_moves(selected_piece_pos)
-		3: valid_moves = get_bishop_moves(selected_piece_pos)
-		4: valid_moves = get_rook_moves(selected_piece_pos)
-		5: valid_moves = get_queen_moves(selected_piece_pos)
-		6: valid_moves = get_king_moves(selected_piece_pos)
+		1: valid_moves = get_moves_pawn(selected_piece_pos)
+		2: valid_moves = get_moves_knight(selected_piece_pos)
+		3: valid_moves = get_moves_bishop(selected_piece_pos)
+		4: valid_moves = get_moves_rook(selected_piece_pos)
+		5: valid_moves = get_moves_queen(selected_piece_pos)
+		6: valid_moves = get_moves_king(selected_piece_pos)
 	return valid_moves
+
+
+func get_moves_pawn(pawn: Vector2) -> Array[Vector2]:
+	# Pawn can move forward or diagonally if capturing, or 1 or 2 spaces first move
+	# or en passante if 1 square into opponents half AND opp moves 2 forward prev move
+	var _moves : Array[Vector2] = []
+	var direction : Vector2
+	var is_first_move := false
+	
+	# get direction of movement
+	if white: 
+		direction = Vector2(1,0)
+	else: 
+		direction = Vector2(-1,0)
+	
+	# if pawn hasn't moved, can move 1 or 2 spaces
+	if (
+			white and pawn.x == 1
+			or !white and pawn.x == 6
+	):
+		is_first_move = true
+		
+	# en passant
+	# if there are eligible captures and the pawn is on an eligible row
+	# and the opponent is exactly 1 col away, we can add the move
+	if (
+			en_passant_pos.length() > 0 
+			and (white and pawn.x == 4 or !white and pawn.x == 3)
+			and abs(en_passant_pos.y - pawn.y) == 1
+	):
+		var passant_pos : Vector2 = pawn + direction
+		# Temporarily move the pawns in order to test if moving them will put 
+		# the king in check. If not: OK
+		board[passant_pos.x][passant_pos.y] = 1 if white else -1
+		board[pawn.x][pawn.y] = 0
+		board[en_passant_pos.x][en_passant_pos.y] = 0
+		if (
+				white and not is_in_check(white_king_pos)
+				or !white and not is_in_check(black_king_pos)
+		):
+			_moves.append(passant_pos)
+		# reverse the temporary pawn moves
+		board[passant_pos.x][passant_pos.y] = 0
+		board[pawn.x][pawn.y] = 1 if white else -1
+		board[en_passant_pos.x][en_passant_pos.y] = -1 if white else 1
+		# the move will be the capture space + vertical direction determined by color
+		_moves.append(en_passant_pos + direction)
+	
+	# check verticals
+	var pos : Vector2 = pawn + direction
+	if is_empty(pos): 
+		# Same as above: Temporarily move piece and test
+		board[pos.x][pos.y] = 1 if white else -1
+		board[pawn.x][pawn.y] = 0
+		if (
+				white and not is_in_check(white_king_pos)
+				or !white and not is_in_check(black_king_pos)
+		):
+			_moves.append(pos)
+		# reverse
+		board[pos.x][pos.y] = 0
+		board[pawn.x][pawn.y] = 1 if white else -1
+	
+	# Handle pawns opening 2 spaces
+	if is_first_move:
+		pos = pawn + direction * 2
+		if is_empty(pawn + direction) and is_empty(pos):
+			# Temporarily move piece and test
+			board[pos.x][pos.y] = 1 if white else -1
+			board[pawn.x][pawn.y] = 0
+			if (
+					white and not is_in_check(white_king_pos)
+					or !white and not is_in_check(black_king_pos)
+			):
+				_moves.append(pos)
+			# reverse
+			board[pos.x][pos.y] = 0
+			board[pawn.x][pawn.y] = 1 if white else -1
+	
+	# check diagonals
+	for dir in [-1, 1]:
+		pos = pawn + Vector2(direction.x, dir)
+		if is_in_bounds(pos):
+			if is_opponent(pos):
+				# Make sure doesn't put the king in check by testing temp position
+				var temp = board[pos.x][pos.y]
+				board[pos.x][pos.y] = 1 if white else -1
+				board[pawn.x][pawn.y] = 0
+				if (
+						white and not is_in_check(white_king_pos)
+						or !white and not is_in_check(black_king_pos)
+				):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] = temp
+				board[pawn.x][pawn.y] = 1 if white else -1
+	return _moves
+
+
+func get_moves_knight(knight: Vector2) -> Array[Vector2]:
+	var _moves : Array[Vector2] = []
+
+	# could also split into halves or quadrants but whatever
+	var directions: Array[Vector2] = [
+		Vector2(2,1), Vector2(1,2), Vector2(-1,2), Vector2(-2,1), 
+		Vector2(-2,-1), Vector2(-1,-2), Vector2(1,-2), Vector2(2, -1)
+	]
+	
+	for dir in directions:
+		var pos : Vector2 = knight
+		pos += dir
+		if is_in_bounds(pos):
+			# Different cases for is_empty and is_opponent
+			if is_empty(pos):
+				# Temporarily move the knight around the board in order to
+				# test if moving it will put the king in check. If not: OK
+				board[pos.x][pos.y] = 2 if white else -2
+				board[knight.x][knight.y] = 0
+				if (
+						white and not is_in_check(white_king_pos)
+						or !white and not is_in_check(black_king_pos)
+				):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] = 0
+				board[knight.x][knight.y] = 2 if white else -2
+				
+			elif is_opponent(pos):
+				var temp = board[pos.x][pos.y]
+				board[pos.x][pos.y] = 2 if white else -2
+				board[knight.x][knight.y] = 0
+				if (
+						white and not is_in_check(white_king_pos)
+						or !white and not is_in_check(black_king_pos)
+				):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] = temp
+				board[knight.x][knight.y] = 2 if white else -2
+		pos = knight
+	return _moves
+
+
+func get_moves_bishop(bishop: Vector2) -> Array[Vector2]:
+	# Similar logic to ROOK and QUEEN below (see ROOK for comments)
+	var _moves : Array[Vector2] = []
+	var directions = [Vector2(1,-1), Vector2(-1,-1), Vector2(1,1), Vector2(-1,1)]
+	
+	for dir in directions:
+		var pos : Vector2 = bishop
+		pos += dir
+		while is_in_bounds(pos):
+			if is_empty(pos):
+				# Temporarily move piece and test
+				board[pos.x][pos.y] = 3 if white else -3
+				board[bishop.x][bishop.y] = 0
+				if (
+						white and not is_in_check(white_king_pos)
+						or !white and !is_in_check(black_king_pos)
+				):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] = 0
+				board[bishop.x][bishop.y] = 3 if white else -3
+				
+			elif is_opponent(pos):
+				var temp = board[pos.x][pos.y]
+				board[pos.x][pos.y] = 3 if white else -3
+				board[bishop.x][bishop.y] = 0
+				if (
+						white and not is_in_check(white_king_pos)
+						or !white and not is_in_check(black_king_pos)
+				):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] = temp
+				board[bishop.x][bishop.y] = 3 if white else -3
+				break
+			else:
+				break
+			pos += dir
+	return _moves
+
+
+func get_moves_rook(rook: Vector2) -> Array[Vector2]:
+	var _moves : Array[Vector2] = []
+	# look down, up, left, right
+	var directions := [Vector2.DOWN,Vector2.UP, Vector2.RIGHT, Vector2.LEFT]
+	# Check in each direction for valid moves until see own piece or out of bounds
+	for dir in directions:
+		var pos : Vector2 = rook
+		pos += dir
+		# keep checking until end of board
+		while is_in_bounds(pos):
+			# if empty or opponent, the move is valid: add pos to list
+			if is_empty(pos):
+				# We temporarily move the rook around the board in order to
+				# check if moving it will put our king in check. If not: OK
+				board[pos.x][pos.y] = 4 if white else -4
+				board[rook.x][rook.y] = 0
+				if (
+						white and not is_in_check(white_king_pos)
+						or !white and not is_in_check(black_king_pos)
+				):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] = 0
+				board[rook.x][rook.y] = 4 if white else -4
+				
+			elif is_opponent(pos):
+				var temp = board[pos.x][pos.y]
+				board[pos.x][pos.y] = 4 if white else -4
+				board[rook.x][rook.y] = 0
+				if (
+						white and not is_in_check(white_king_pos)
+						or !white and not is_in_check(black_king_pos)
+				):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] = temp
+				board[rook.x][rook.y] = 4 if white else -4
+				break
+			# All valid moves exhausted, check the next direction
+			else:
+				break 
+			pos += dir
+	return _moves
+
+
+func get_moves_queen(queen: Vector2) -> Array[Vector2]:
+	# Similar logic as ROOK
+	var _moves : Array[Vector2] = []
+	var directions = [
+		Vector2(0,-1),Vector2(0,1), Vector2(1,0), Vector2(-1,0),
+		Vector2(1,-1), Vector2(-1,-1), Vector2(1,1), Vector2(-1,1)
+	]
+
+	for dir in directions:
+		var pos : Vector2 = queen
+		pos += dir
+		while is_in_bounds(pos):
+			if is_empty(pos):
+				# See above methods for comment
+				board[pos.x][pos.y] = 5 if white else -5
+				board[queen.x][queen.y] = 0
+				if (
+						white and not is_in_check(white_king_pos)
+						or !white and not is_in_check(black_king_pos)
+				):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] = 0
+				board[queen.x][queen.y] = 5 if white else -5
+				
+			elif is_opponent(pos):
+				var temp = board[pos.x][pos.y]
+				board[pos.x][pos.y] = 5 if white else -5
+				board[queen.x][queen.y] = 0
+				if (
+						white and not is_in_check(white_king_pos)
+						or !white and not is_in_check(black_king_pos)
+				):
+					_moves.append(pos)
+				# reverse
+				board[pos.x][pos.y] = temp
+				board[queen.x][queen.y] = 5 if white else -5
+				break
+			else:
+				break
+			pos += dir
+	return _moves
+
+
+func get_moves_king(king: Vector2) -> Array[Vector2]:
+	var _moves : Array[Vector2] = []
+	var directions : Array[Vector2] = [
+		Vector2(1,0), Vector2(1,1), Vector2(0,1), Vector2(-1,1),
+		Vector2(-1,0), Vector2(-1,-1), Vector2(0,-1), Vector2(1,-1)
+	]
+	
+	# Temporarily hide moving king from analysis - so he can't "block" himself
+	if white:
+		board[white_king_pos.x][white_king_pos.y] = 0
+	else:
+		board[black_king_pos.x][black_king_pos.y] = 0
+	
+	# analyze every direction for valid move
+	for dir in directions:
+		var pos : Vector2 = king + dir
+		if is_in_bounds(pos):
+			if not is_in_check(pos):
+				if is_empty(pos) or is_opponent(pos): 
+					_moves.append(pos)
+			
+	# check castle eligibility and return moves
+	if white and not king_moved["white"]:
+		if not rook_moved["white left"]:
+			if (
+					is_empty(Vector2(0,3)) and not is_in_check(Vector2(0,3))
+					and is_empty(Vector2(0,2)) and not is_in_check(Vector2(0,2))
+					and is_empty(Vector2(0,1)) and not is_in_check(Vector2(0,1))
+			):
+				_moves.append(Vector2(0,2))
+				
+		if not rook_moved["white right"]:
+			if (
+					is_empty(Vector2(0,5)) and not is_in_check(Vector2(0,5))
+					and is_empty(Vector2(0,6)) and not is_in_check(Vector2(0,6))
+			):
+				_moves.append(Vector2(0,6))
+		
+	elif !white and not king_moved["black"]:
+		if not rook_moved["black left"]:
+			if (
+					is_empty(Vector2(7,3)) and not is_in_check(Vector2(7,3))
+					and is_empty(Vector2(7,2)) and not is_in_check(Vector2(7,2))
+					and is_empty(Vector2(7,1)) and not is_in_check(Vector2(7,1))
+			):
+				_moves.append(Vector2(7,2))
+				
+		if not rook_moved["black right"]:
+			if (
+					is_empty(Vector2(7,5)) and not is_in_check(Vector2(7,5))
+					and is_empty(Vector2(7,6)) and not is_in_check(Vector2(7,6))
+			):
+				_moves.append(Vector2(7,6))
+				
+	# Unhide the king
+	if white:
+		board[white_king_pos.x][white_king_pos.y] = 6
+	else:
+		board[black_king_pos.x][black_king_pos.y] = -6
+	
+	return _moves
+
+
+func incr_fifty_moves(pawn_moved: bool) -> void:
+	# If no captures and no pawn moves for 50 turns -> offered draw
+	if captured_val == 0 and not pawn_moved:
+		fifty_moves += 1
+	else:
+		fifty_moves = 0
+
+
+func is_dead_position() -> bool:
+	# If both sides have 1) A lone king, 2) King and Knight only 3) King and bishop only
+	# OR 4) one side has a lone King and the other side has a King and two Knights
+	# King vs. King
+	# King and Bishop vs. King
+	# King and Knight vs. King
+	# King and two knights vs. King (Per USCF not FIDE)
+	var white_knights = 0
+	var black_knights = 0
+	var white_bishops = 0
+	var black_bishops = 0
+	
+	for i in BOARD_SIZE:
+		for j in BOARD_SIZE:
+			match board[i][j]:
+				2:
+					# count knights
+					white_knights += 1
+				-2:
+					black_knights += 1
+				3:
+					if white_bishops == 0: 
+						white_bishops += 1
+					else:
+						# if bishop count > 1, not insufficient
+						return false
+				-3:
+					if black_bishops == 0: 
+						black_bishops += 1
+					else:
+						# if knight and/or bishop count > 1, not insufficient
+						return false
+				6, -6, 0: 
+					pass
+				_: # Any num pawns, rooks or queens are sufficient
+					return false
+	if (
+			# At this point we know there are no pawns, rooks, queens, or bishops > 1
+			# (Probably a more elegant way of doing this)
+			# King + Bishops <= 1 (also captures King vs King)
+			# King + Knights <= 2
+			white_knights == 0 and white_bishops == 0 and black_knights == 0 and black_bishops <= 1
+			or white_knights == 0 and white_bishops == 0 and black_knights <= 2 and black_bishops == 0
+			# Repeat for black
+			or black_knights == 0 and black_bishops == 0 and white_knights == 0 and white_bishops <= 1
+			or black_knights == 0 and black_bishops == 0 and white_knights <= 2 and white_bishops == 0
+	):
+		# insufficient material confirmed
+		return true
+	else:
+		return false
+
+
+func is_empty(coords: Vector2) -> bool:
+	return board[coords.x][coords.y] == 0
+
+
+func is_fifty_moves() -> bool:
+	return fifty_moves >= 50
+
+
+func is_in_bounds(coords: Vector2) -> bool:
+	# First check that the coords exist (on board)
+	if coords.x >= 0 and coords.x < BOARD_SIZE and coords.y >= 0 and coords.y < BOARD_SIZE:
+		return true
+	return false
+
+
+func is_in_check(check_pos: Vector2) -> bool:
+	var directions : Array[Vector2] = [
+		Vector2(1,0), Vector2(1,1), Vector2(0,1), Vector2(-1,1),
+		Vector2(-1,0), Vector2(-1,-1), Vector2(0,-1), Vector2(1,-1)
+	]
+	
+	# Test Pawns -- when they are pos + (direction, +/- 1)
+	var pawn_dir = 1 if white else -1
+	var pawn_attacks : Array[Vector2] = [
+		check_pos + Vector2(pawn_dir, -1),
+		check_pos + Vector2(pawn_dir, 1)
+	]
+	# simple diagonal
+	for p in pawn_attacks:
+		if is_in_bounds(p):
+			if (
+					white and board[p.x][p.y] == -1
+					or !white and board[p.x][p.y] == 1
+			):
+				return true
+				
+	# simple king check
+	for dir in directions:
+		var pos = check_pos + dir
+		if is_in_bounds(pos):
+			if (
+					white and board[pos.x][pos.y] == -6
+					or !white and board[pos.x][pos.y] == 6
+			): 
+				return true
+			
+	# checking long range opponents in all directions
+	for dir in directions:
+		var pos = check_pos + dir
+		while is_in_bounds(pos):
+			if not is_empty(pos):
+				var piece = board[pos.x][pos.y]
+				# vertical/horizontal - if we encounter a rook or queen it's a check
+				if dir.x == 0 or dir.y == 0:
+					if (
+							white and piece in [-4, -5]
+							or !white and piece in [4, 5]
+					):
+						return true
+				# diagonal - if we encounter a bishop or queen it's a check
+				elif dir.x != 0 and dir.y != 0:
+					if (
+							white and piece in [-3, -5]
+							or !white and piece in [3, 5]
+					):
+						return true
+				break
+			pos += dir
+	
+	# KNIGHT
+	directions = [
+		Vector2(2, 1), Vector2(2, -1), Vector2(1, 2), Vector2(1, -2),
+		Vector2(-2, 1), Vector2(-2, -1), Vector2(-1, 2), Vector2(-1, -2)
+	]
+	
+	for dir in directions:
+		var pos = check_pos + dir
+		if is_in_bounds(pos):
+			if (
+					white and board[pos.x][pos.y] == -2
+					or !white and board[pos.x][pos.y] == 2
+			):
+				return true
+	
+	# Not in check
+	return false
+
+
+func is_mouse_out() -> bool:
+	# Godot functionality
+	if get_rect().has_point(to_local(get_global_mouse_position())):
+		return false
+	return true
+
+
+func is_opponent(coords: Vector2) -> bool:
+	var piece : int = board[coords.x][coords.y]
+	# if white and piece is black (or vice versa) - valid
+	if (
+		white and piece < 0
+		or !white and piece > 0
+	):
+		return true
+	return false
+
+
+func promote(_promotion_square: Vector2) -> void:
+	promotion_square = _promotion_square
+	# See _ready() for initializing this button display - 'white' is a boolean
+	white_promo_pieces.visible = white
+	black_promo_pieces.visible = !white
+
+
+func record_history(start_pos: Vector2, end_pos: Vector2, piece_val: int, capture_val: int, passant: bool, promo: int) -> void:
+	# increment move
+	move_number += 1
+	
+	history.append({
+	"move" : move_number,
+	"start_pos" : start_pos, 
+	"end_pos" : end_pos,
+	"piece" : piece_val,
+	"captured" : capture_val,
+	"is_passant" : passant,
+	"promo" : promo, 
+	"castle" : castle_type
+	})
 
 
 func set_move(row: int, col: int) -> void:
@@ -379,31 +910,6 @@ func set_move(row: int, col: int) -> void:
 		print("DRAW: Insufficient material")
 
 
-func record_history(start_pos: Vector2, end_pos: Vector2, piece_val: int, capture_val: int, passant: bool, promo: int) -> void:
-	# increment move
-	move_number += 1
-	
-	history.append({
-	"move" : move_number,
-	"start_pos" : start_pos, 
-	"end_pos" : end_pos,
-	"piece" : piece_val,
-	"captured" : capture_val,
-	"is_passant" : passant,
-	"promo" : promo, 
-	"castle" : castle_type
-	})
-
-
-func show_options() -> void:
-	moves = get_moves(selected_piece_pos)
-	# If there are no legal moves, revert to previous state
-	if moves.is_empty():
-		state = "selecting"
-		return
-	show_dots()
-
-
 func show_dots(to_show: bool = true) -> void:
 	# show the dots
 	if to_show:
@@ -419,522 +925,16 @@ func show_dots(to_show: bool = true) -> void:
 			child.queue_free()
 
 
-func check_unique_board(board_to_check: Array) -> void:
-	for b in unique_board_moves.size():
-		if board_to_check == unique_board_moves[b]:
-			num_unique_moves[b] += 1
-			if num_unique_moves[b] == 5:
-				# TODO
-				print("DRAW: Fivefold repetition rule")
-			elif num_unique_moves[b] >= 3:
-				# TODO
-				print("DRAW? Threefold repetition rule")
-			return
-	unique_board_moves.append(board_to_check.duplicate(true))
-	num_unique_moves.append(1)
+func show_options() -> void:
+	moves = get_moves(selected_piece_pos)
+	# If there are no legal moves, revert to previous state
+	if moves.is_empty():
+		state = "selecting"
+		return
+	show_dots()
 
 
-func is_dead_position() -> bool:
-	# If both sides have 1) A lone king, 2) King and Knight only 3) King and bishop only
-	# OR 4) one side has a lone King and the other side has a King and two Knights
-	# King vs. King
-	# King and Bishop vs. King
-	# King and Knight vs. King
-	# King and two knights vs. King (Per USCF not FIDE)
-	var white_knights = 0
-	var black_knights = 0
-	var white_bishops = 0
-	var black_bishops = 0
-	
-	for i in BOARD_SIZE:
-		for j in BOARD_SIZE:
-			match board[i][j]:
-				2:
-					# count knights
-					white_knights += 1
-				-2:
-					black_knights += 1
-				3:
-					if white_bishops == 0: 
-						white_bishops += 1
-					else:
-						# if bishop count > 1, not insufficient
-						return false
-				-3:
-					if black_bishops == 0: 
-						black_bishops += 1
-					else:
-						# if knight and/or bishop count > 1, not insufficient
-						return false
-				6, -6, 0: 
-					pass
-				_: # Any num pawns, rooks or queens are sufficient
-					return false
-	if (
-			# At this point we know there are no pawns, rooks, queens, or bishops > 1
-			# (Probably a more elegant way of doing this)
-			# King + Bishops <= 1 (also captures King vs King)
-			# King + Knights <= 2
-			white_knights == 0 and white_bishops == 0 and black_knights == 0 and black_bishops <= 1
-			or white_knights == 0 and white_bishops == 0 and black_knights <= 2 and black_bishops == 0
-			# Repeat for black
-			or black_knights == 0 and black_bishops == 0 and white_knights == 0 and white_bishops <= 1
-			or black_knights == 0 and black_bishops == 0 and white_knights <= 2 and white_bishops == 0
-	):
-		# insufficient material confirmed
-		return true
-	else:
-		return false
-
-
-func is_fifty_moves() -> bool:
-	return fifty_moves >= 50
-
-
-func is_empty(coords: Vector2) -> bool:
-	return board[coords.x][coords.y] == 0
-
-
-func is_in_bounds(coords: Vector2) -> bool:
-	# First check that the coords exist (on board)
-	if coords.x >= 0 and coords.x < BOARD_SIZE and coords.y >= 0 and coords.y < BOARD_SIZE:
-		return true
-	return false
-
-
-func is_in_check(check_pos: Vector2) -> bool:
-	var directions : Array[Vector2] = [
-		Vector2(1,0), Vector2(1,1), Vector2(0,1), Vector2(-1,1),
-		Vector2(-1,0), Vector2(-1,-1), Vector2(0,-1), Vector2(1,-1)
-	]
-	
-	# Test Pawns -- when they are pos + (direction, +/- 1)
-	var pawn_dir = 1 if white else -1
-	var pawn_attacks : Array[Vector2] = [
-		check_pos + Vector2(pawn_dir, -1),
-		check_pos + Vector2(pawn_dir, 1)
-	]
-	# simple diagonal
-	for p in pawn_attacks:
-		if is_in_bounds(p):
-			if (
-					white and board[p.x][p.y] == -1
-					or !white and board[p.x][p.y] == 1
-			):
-				return true
-				
-	# simple king check
-	for dir in directions:
-		var pos = check_pos + dir
-		if is_in_bounds(pos):
-			if (
-					white and board[pos.x][pos.y] == -6
-					or !white and board[pos.x][pos.y] == 6
-			): 
-				return true
-			
-	# checking long range opponents in all directions
-	for dir in directions:
-		var pos = check_pos + dir
-		while is_in_bounds(pos):
-			if not is_empty(pos):
-				var piece = board[pos.x][pos.y]
-				# vertical/horizontal - if we encounter a rook or queen it's a check
-				if dir.x == 0 or dir.y == 0:
-					if (
-							white and piece in [-4, -5]
-							or !white and piece in [4, 5]
-					):
-						return true
-				# diagonal - if we encounter a bishop or queen it's a check
-				elif dir.x != 0 and dir.y != 0:
-					if (
-							white and piece in [-3, -5]
-							or !white and piece in [3, 5]
-					):
-						return true
-				break
-			pos += dir
-	
-	# KNIGHT
-	directions = [
-		Vector2(2, 1), Vector2(2, -1), Vector2(1, 2), Vector2(1, -2),
-		Vector2(-2, 1), Vector2(-2, -1), Vector2(-1, 2), Vector2(-1, -2)
-	]
-	
-	for dir in directions:
-		var pos = check_pos + dir
-		if is_in_bounds(pos):
-			if (
-					white and board[pos.x][pos.y] == -2
-					or !white and board[pos.x][pos.y] == 2
-			):
-				return true
-	
-	# Not in check
-	return false
-
-
-func is_mouse_out() -> bool:
-	# Godot functionality
-	if get_rect().has_point(to_local(get_global_mouse_position())):
-		return false
-	return true
-
-
-func is_opponent(coords: Vector2) -> bool:
-	var piece : int = board[coords.x][coords.y]
-	# if white and piece is black (or vice versa) - valid
-	if (
-		white and piece < 0
-		or !white and piece > 0
-	):
-		return true
-	return false
-
-
-func promote(_promotion_square: Vector2) -> void:
-	promotion_square = _promotion_square
-	# See _ready() for initializing this button display - 'white' is a boolean
-	white_promo_pieces.visible = white
-	black_promo_pieces.visible = !white
-
-
-func get_pawn_moves(pawn: Vector2) -> Array[Vector2]:
-	# Pawn can move forward or diagonally if capturing, or 1 or 2 spaces first move
-	# or en passante if 1 square into opponents half AND opp moves 2 forward prev move
-	var _moves : Array[Vector2] = []
-	var direction : Vector2
-	var is_first_move := false
-	
-	# get direction of movement
-	if white: 
-		direction = Vector2(1,0)
-	else: 
-		direction = Vector2(-1,0)
-	
-	# if pawn hasn't moved, can move 1 or 2 spaces
-	if (
-			white and pawn.x == 1
-			or !white and pawn.x == 6
-	):
-		is_first_move = true
-		
-	# en passant
-	# if there are eligible captures and the pawn is on an eligible row
-	# and the opponent is exactly 1 col away, we can add the move
-	if (
-			en_passant_pos.length() > 0 
-			and (white and pawn.x == 4 or !white and pawn.x == 3)
-			and abs(en_passant_pos.y - pawn.y) == 1
-	):
-		var passant_pos : Vector2 = pawn + direction
-		# Temporarily move the pawns in order to test if moving them will put 
-		# the king in check. If not: OK
-		board[passant_pos.x][passant_pos.y] = 1 if white else -1
-		board[pawn.x][pawn.y] = 0
-		board[en_passant_pos.x][en_passant_pos.y] = 0
-		if (
-				white and not is_in_check(white_king_pos)
-				or !white and not is_in_check(black_king_pos)
-		):
-			_moves.append(passant_pos)
-		# reverse the temporary pawn moves
-		board[passant_pos.x][passant_pos.y] = 0
-		board[pawn.x][pawn.y] = 1 if white else -1
-		board[en_passant_pos.x][en_passant_pos.y] = -1 if white else 1
-		# the move will be the capture space + vertical direction determined by color
-		_moves.append(en_passant_pos + direction)
-	
-	# check verticals
-	var pos : Vector2 = pawn + direction
-	if is_empty(pos): 
-		# Same as above: Temporarily move piece and test
-		board[pos.x][pos.y] = 1 if white else -1
-		board[pawn.x][pawn.y] = 0
-		if (
-				white and not is_in_check(white_king_pos)
-				or !white and not is_in_check(black_king_pos)
-		):
-			_moves.append(pos)
-		# reverse
-		board[pos.x][pos.y] = 0
-		board[pawn.x][pawn.y] = 1 if white else -1
-	
-	# Handle pawns opening 2 spaces
-	if is_first_move:
-		pos = pawn + direction * 2
-		if is_empty(pawn + direction) and is_empty(pos):
-			# Temporarily move piece and test
-			board[pos.x][pos.y] = 1 if white else -1
-			board[pawn.x][pawn.y] = 0
-			if (
-					white and not is_in_check(white_king_pos)
-					or !white and not is_in_check(black_king_pos)
-			):
-				_moves.append(pos)
-			# reverse
-			board[pos.x][pos.y] = 0
-			board[pawn.x][pawn.y] = 1 if white else -1
-	
-	# check diagonals
-	for dir in [-1, 1]:
-		pos = pawn + Vector2(direction.x, dir)
-		if is_in_bounds(pos):
-			if is_opponent(pos):
-				# Make sure doesn't put the king in check by testing temp position
-				var temp = board[pos.x][pos.y]
-				board[pos.x][pos.y] = 1 if white else -1
-				board[pawn.x][pawn.y] = 0
-				if (
-						white and not is_in_check(white_king_pos)
-						or !white and not is_in_check(black_king_pos)
-				):
-					_moves.append(pos)
-				# reverse
-				board[pos.x][pos.y] = temp
-				board[pawn.x][pawn.y] = 1 if white else -1
-	return _moves
-
-
-func get_knight_moves(knight: Vector2) -> Array[Vector2]:
-	var _moves : Array[Vector2] = []
-
-	# could also split into halves or quadrants but whatever
-	var directions: Array[Vector2] = [
-		Vector2(2,1), Vector2(1,2), Vector2(-1,2), Vector2(-2,1), 
-		Vector2(-2,-1), Vector2(-1,-2), Vector2(1,-2), Vector2(2, -1)
-	]
-	
-	for dir in directions:
-		var pos : Vector2 = knight
-		pos += dir
-		if is_in_bounds(pos):
-			# Different cases for is_empty and is_opponent
-			if is_empty(pos):
-				# Temporarily move the knight around the board in order to
-				# test if moving it will put the king in check. If not: OK
-				board[pos.x][pos.y] = 2 if white else -2
-				board[knight.x][knight.y] = 0
-				if (
-						white and not is_in_check(white_king_pos)
-						or !white and not is_in_check(black_king_pos)
-				):
-					_moves.append(pos)
-				# reverse
-				board[pos.x][pos.y] = 0
-				board[knight.x][knight.y] = 2 if white else -2
-				
-			elif is_opponent(pos):
-				var temp = board[pos.x][pos.y]
-				board[pos.x][pos.y] = 2 if white else -2
-				board[knight.x][knight.y] = 0
-				if (
-						white and not is_in_check(white_king_pos)
-						or !white and not is_in_check(black_king_pos)
-				):
-					_moves.append(pos)
-				# reverse
-				board[pos.x][pos.y] = temp
-				board[knight.x][knight.y] = 2 if white else -2
-		pos = knight
-	return _moves
-
-
-func get_bishop_moves(bishop: Vector2) -> Array[Vector2]:
-	# Similar logic to ROOK and QUEEN below (see ROOK for comments)
-	var _moves : Array[Vector2] = []
-	var directions = [Vector2(1,-1), Vector2(-1,-1), Vector2(1,1), Vector2(-1,1)]
-	
-	for dir in directions:
-		var pos : Vector2 = bishop
-		pos += dir
-		while is_in_bounds(pos):
-			if is_empty(pos):
-				# Temporarily move piece and test
-				board[pos.x][pos.y] = 3 if white else -3
-				board[bishop.x][bishop.y] = 0
-				if (
-						white and not is_in_check(white_king_pos)
-						or !white and !is_in_check(black_king_pos)
-				):
-					_moves.append(pos)
-				# reverse
-				board[pos.x][pos.y] = 0
-				board[bishop.x][bishop.y] = 3 if white else -3
-				
-			elif is_opponent(pos):
-				var temp = board[pos.x][pos.y]
-				board[pos.x][pos.y] = 3 if white else -3
-				board[bishop.x][bishop.y] = 0
-				if (
-						white and not is_in_check(white_king_pos)
-						or !white and not is_in_check(black_king_pos)
-				):
-					_moves.append(pos)
-				# reverse
-				board[pos.x][pos.y] = temp
-				board[bishop.x][bishop.y] = 3 if white else -3
-				break
-			else:
-				break
-			pos += dir
-	return _moves
-
-
-func get_rook_moves(rook: Vector2) -> Array[Vector2]:
-	var _moves : Array[Vector2] = []
-	# look down, up, left, right
-	var directions := [Vector2.DOWN,Vector2.UP, Vector2.RIGHT, Vector2.LEFT]
-	# Check in each direction for valid moves until see own piece or out of bounds
-	for dir in directions:
-		var pos : Vector2 = rook
-		pos += dir
-		# keep checking until end of board
-		while is_in_bounds(pos):
-			# if empty or opponent, the move is valid: add pos to list
-			if is_empty(pos):
-				# We temporarily move the rook around the board in order to
-				# check if moving it will put our king in check. If not: OK
-				board[pos.x][pos.y] = 4 if white else -4
-				board[rook.x][rook.y] = 0
-				if (
-						white and not is_in_check(white_king_pos)
-						or !white and not is_in_check(black_king_pos)
-				):
-					_moves.append(pos)
-				# reverse
-				board[pos.x][pos.y] = 0
-				board[rook.x][rook.y] = 4 if white else -4
-				
-			elif is_opponent(pos):
-				var temp = board[pos.x][pos.y]
-				board[pos.x][pos.y] = 4 if white else -4
-				board[rook.x][rook.y] = 0
-				if (
-						white and not is_in_check(white_king_pos)
-						or !white and not is_in_check(black_king_pos)
-				):
-					_moves.append(pos)
-				# reverse
-				board[pos.x][pos.y] = temp
-				board[rook.x][rook.y] = 4 if white else -4
-				break
-			# All valid moves exhausted, check the next direction
-			else:
-				break 
-			pos += dir
-	return _moves
-
-
-func get_queen_moves(queen: Vector2) -> Array[Vector2]:
-	# Similar logic as ROOK
-	var _moves : Array[Vector2] = []
-	var directions = [
-		Vector2(0,-1),Vector2(0,1), Vector2(1,0), Vector2(-1,0),
-		Vector2(1,-1), Vector2(-1,-1), Vector2(1,1), Vector2(-1,1)
-	]
-
-	for dir in directions:
-		var pos : Vector2 = queen
-		pos += dir
-		while is_in_bounds(pos):
-			if is_empty(pos):
-				# See above methods for comment
-				board[pos.x][pos.y] = 5 if white else -5
-				board[queen.x][queen.y] = 0
-				if (
-						white and not is_in_check(white_king_pos)
-						or !white and not is_in_check(black_king_pos)
-				):
-					_moves.append(pos)
-				# reverse
-				board[pos.x][pos.y] = 0
-				board[queen.x][queen.y] = 5 if white else -5
-				
-			elif is_opponent(pos):
-				var temp = board[pos.x][pos.y]
-				board[pos.x][pos.y] = 5 if white else -5
-				board[queen.x][queen.y] = 0
-				if (
-						white and not is_in_check(white_king_pos)
-						or !white and not is_in_check(black_king_pos)
-				):
-					_moves.append(pos)
-				# reverse
-				board[pos.x][pos.y] = temp
-				board[queen.x][queen.y] = 5 if white else -5
-				break
-			else:
-				break
-			pos += dir
-	return _moves
-
-
-func get_king_moves(king: Vector2) -> Array[Vector2]:
-	var _moves : Array[Vector2] = []
-	var directions : Array[Vector2] = [
-		Vector2(1,0), Vector2(1,1), Vector2(0,1), Vector2(-1,1),
-		Vector2(-1,0), Vector2(-1,-1), Vector2(0,-1), Vector2(1,-1)
-	]
-	
-	# Temporarily hide moving king from analysis - so he can't "block" himself
-	if white:
-		board[white_king_pos.x][white_king_pos.y] = 0
-	else:
-		board[black_king_pos.x][black_king_pos.y] = 0
-	
-	# analyze every direction for valid move
-	for dir in directions:
-		var pos : Vector2 = king + dir
-		if is_in_bounds(pos):
-			if not is_in_check(pos):
-				if is_empty(pos) or is_opponent(pos): 
-					_moves.append(pos)
-			
-	# check castle eligibility and return moves
-	if white and not king_moved["white"]:
-		if not rook_moved["white left"]:
-			if (
-					is_empty(Vector2(0,3)) and not is_in_check(Vector2(0,3))
-					and is_empty(Vector2(0,2)) and not is_in_check(Vector2(0,2))
-					and is_empty(Vector2(0,1)) and not is_in_check(Vector2(0,1))
-			):
-				_moves.append(Vector2(0,2))
-				
-		if not rook_moved["white right"]:
-			if (
-					is_empty(Vector2(0,5)) and not is_in_check(Vector2(0,5))
-					and is_empty(Vector2(0,6)) and not is_in_check(Vector2(0,6))
-			):
-				_moves.append(Vector2(0,6))
-		
-	elif !white and not king_moved["black"]:
-		if not rook_moved["black left"]:
-			if (
-					is_empty(Vector2(7,3)) and not is_in_check(Vector2(7,3))
-					and is_empty(Vector2(7,2)) and not is_in_check(Vector2(7,2))
-					and is_empty(Vector2(7,1)) and not is_in_check(Vector2(7,1))
-			):
-				_moves.append(Vector2(7,2))
-				
-		if not rook_moved["black right"]:
-			if (
-					is_empty(Vector2(7,5)) and not is_in_check(Vector2(7,5))
-					and is_empty(Vector2(7,6)) and not is_in_check(Vector2(7,6))
-			):
-				_moves.append(Vector2(7,6))
-				
-	# Unhide the king
-	if white:
-		board[white_king_pos.x][white_king_pos.y] = 6
-	else:
-		board[black_king_pos.x][black_king_pos.y] = -6
-	
-	return _moves
-
-
-func _on_button_pressed(button: Node) -> void:
+func _on_promotion_pressed(button: Node) -> void:
 	# get the piece value from the name (ensure it's 1 char)
 	var val : int = int(button.name.substr(0,1))
 	
