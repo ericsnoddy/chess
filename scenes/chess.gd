@@ -723,7 +723,7 @@ func is_opponent(coords: Vector2) -> bool:
 	return false
 
 
-# Method is_stalemate() should only be called while not in check
+# This method can deduce checkmate depending on whether or not currently in check.
 func is_stalemate() -> bool:
 	for i in BOARD_SIZE:
 		for j in BOARD_SIZE:
@@ -918,9 +918,20 @@ func set_move(row: int, col: int) -> void:
 		show_options()
 		state = "confirming"
 	
-	if is_fifty_moves(): 
+	# If thera are no valid moves
+	if is_stalemate():
+		# There are no legal moves; check = checkmate, no check = stalemate
+		if white and is_in_check(white_king_pos) or !white and is_in_check(black_king_pos):
+			# TODO
+			print("CHECKMATE")
+		else:
+			# TODO
+			print("STALEMATE")
+		
+	elif is_fifty_moves(): 
 		# TODO
 		print("DRAW: 50 moves rule")
+		
 	elif is_dead_position(): 
 		# TODO
 		print("DRAW: Insufficient material")
