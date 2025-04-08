@@ -723,6 +723,22 @@ func is_opponent(coords: Vector2) -> bool:
 	return false
 
 
+# Method is_stalemate() should only be called while not in check
+func is_stalemate() -> bool:
+	for i in BOARD_SIZE:
+		for j in BOARD_SIZE:
+			var test_piece : int = board[i][j]
+			# Test only relevant pieces
+			if white and test_piece > 0 or !white and test_piece < 0:
+				var test_pos := Vector2(i, j)
+				# If any moves exist, can't be stalemate
+				if not get_moves(test_pos).is_empty():
+					return false
+		
+	# No valid moves were found
+	return true
+
+
 func promote(_promotion_square: Vector2) -> void:
 	promotion_square = _promotion_square
 	# See _ready() for initializing this button display - 'white' is a boolean
