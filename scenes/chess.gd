@@ -91,8 +91,8 @@ var fifty_moves := 0
 	#(2) pieces of the same kind and color occupy the same squares, and
 	#(3) the possible moves of all the pieces are the same.
 # I'm going the lazy route and just checking (2)
-var unique_board_moves: Array = []
-var num_unique_moves: Array = []
+var unique_board_moves : Array[Array] = []
+var num_unique_moves : Array[int] = []
 
 
 @onready var pieces : Node2D = $Pieces
@@ -168,6 +168,7 @@ func check_unique_board(board_to_check: Array) -> void:
 				# TODO
 				print("DRAW? Threefold repetition rule")
 			return
+	# Duplicate because we don't want to store a mutable copy
 	unique_board_moves.append(board_to_check.duplicate(true))
 	num_unique_moves.append(1)
 
@@ -732,7 +733,7 @@ func is_stalemate() -> bool:
 			if white and test_piece > 0 or !white and test_piece < 0:
 				var test_pos := Vector2(i, j)
 				# If any moves exist, can't be stalemate
-				if not get_moves(test_pos).is_empty():
+				if get_moves(test_pos).is_empty():
 					return false
 		
 	# No valid moves were found
@@ -918,23 +919,26 @@ func set_move(row: int, col: int) -> void:
 		show_options()
 		state = "confirming"
 	
+	# BREAKS THE GAME??!?
+	
 	# If thera are no valid moves
-	if is_stalemate():
-		# There are no legal moves; check = checkmate, no check = stalemate
-		if white and is_in_check(white_king_pos) or !white and is_in_check(black_king_pos):
-			# TODO
-			print("CHECKMATE")
-		else:
-			# TODO
-			print("STALEMATE")
+	#elif is_stalemate():
+		## There are no legal moves; check = checkmate, no check = stalemate
+		#if white and is_in_check(white_king_pos) or !white and is_in_check(black_king_pos):
+			## TODO
+			#print("CHECKMATE")
+		#else:
+			## TODO
+			#print("STALEMATE")
 		
-	elif is_fifty_moves(): 
+	if is_fifty_moves(): 
 		# TODO
 		print("DRAW: 50 moves rule")
 		
 	elif is_dead_position(): 
 		# TODO
 		print("DRAW: Insufficient material")
+		
 
 
 func show_dots(to_show: bool = true) -> void:
