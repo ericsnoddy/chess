@@ -919,9 +919,9 @@ func set_move(row: int, col: int) -> void:
 		show_options()
 		state = "confirming"
 	
-	# BREAKS THE GAME??!?
+	# WHY DOES THE FOLLOWING CONDITIONAL BREAK THE GAME??!?
 	
-	# If thera are no valid moves
+	## If thera are no valid moves
 	#elif is_stalemate():
 		## There are no legal moves; check = checkmate, no check = stalemate
 		#if white and is_in_check(white_king_pos) or !white and is_in_check(black_king_pos):
@@ -938,7 +938,6 @@ func set_move(row: int, col: int) -> void:
 	elif is_dead_position(): 
 		# TODO
 		print("DRAW: Insufficient material")
-		
 
 
 func show_dots(to_show: bool = true) -> void:
